@@ -2,14 +2,28 @@
  * PixiRenderer - PixiJS v8 implementation of the Renderer interface.
  */
 
-import { Application, Container, Graphics, Sprite, Texture, Assets } from 'pixi.js';
-import type { Renderer, RendererConfig, SpriteConfig, RenderObject } from './Renderer';
+import { Application, Container, Graphics, Sprite, Texture, Assets, Rectangle } from 'pixi.js';
+import type { Renderer, RendererConfig, SpriteConfig, AnimatedSpriteConfig, RenderObject } from './Renderer';
 
 /** PixiJS implementation of RenderObject */
 class PixiRenderObject implements RenderObject {
   private displayObject: Sprite | Graphics;
   private container: Container;
   private config: SpriteConfig;
+
+  /**
+   * The base texture for sprite sheet operations.
+   *
+   * WHY store this separately from displayObject.texture?
+   * When we call setTextureRegion(), we create NEW Texture objects that
+   * reference different rectangular regions of this base texture. The
+   * displayObject.texture changes each frame, but baseTexture stays constant.
+   *
+   * Without storing baseTexture, we'd lose the original full-sheet texture
+   * after the first setTextureRegion() call, making subsequent region
+   * changes impossible.
+   */
+  private baseTexture: Texture | null = null;
 
   constructor(displayObject: Sprite | Graphics, container: Container, config: SpriteConfig) {
     this.displayObject = displayObject;
@@ -67,6 +81,67 @@ class PixiRenderObject implements RenderObject {
   destroy(): void {
     this.container.removeChild(this.displayObject);
     this.displayObject.destroy();
+  }
+
+  /**
+   * Store the base texture for sprite sheet animation.
+   * Called once when the full sprite sheet texture is loaded.
+   */
+  setBaseTexture(texture: Texture): void {
+    this.baseTexture = texture;
+  }
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * TEXTURE REGION SELECTION (Sprite Sheet Animation)
+   * ═══════════════════════════════════════════════════════════════════════════
+   *
+   * This method creates a "view" into a portion of the sprite sheet texture.
+   * Each animation frame is a rectangular region of the larger texture.
+   *
+   * How PixiJS Texture Frames Work:
+   * ┌─────────────────────────────────────────────────────────────┐
+   * │  baseTexture (full sprite sheet, e.g. 128x64 pixels)       │
+   * │  ┌───────┬───────┬───────┬───────┐                         │
+   * │  │ frame │ frame │ frame │ frame │                         │
+   * │  │   0   │   1   │   2   │   3   │  ← Row 0                │
+   * │  ├───────┼───────┼───────┼───────┤                         │
+   * │  │ frame │ frame │ frame │ frame │                         │
+   * │  │   4   │   5   │   6   │   7   │  ← Row 1                │
+   * │  └───────┴───────┴───────┴───────┘                         │
+   * │          ↑                                                  │
+   * │    new Texture({ source: baseTexture.source,               │
+   * │                  frame: Rectangle(32, 0, 32, 32) })        │
+   * │    Creates a texture showing ONLY frame 1                   │
+   * └─────────────────────────────────────────────────────────────┘
+   *
+   * WHY create new Texture objects instead of modifying the existing one?
+   * PixiJS Texture objects are immutable after creation. The frame property
+   * is set at construction time. To show a different region, we must create
+   * a new Texture with a different frame Rectangle.
+   *
+   * @param x - Left edge of the frame in pixels
+   * @param y - Top edge of the frame in pixels
+   * @param width - Frame width in pixels
+   * @param height - Frame height in pixels
+   */
+  setTextureRegion(x: number, y: number, width: number, height: number): void {
+    // Guard: Need a base texture and a Sprite (not Graphics placeholder)
+    if (!this.baseTexture) return;
+    if (!(this.displayObject instanceof Sprite)) return;
+
+    // Create a Rectangle defining the region of the sprite sheet to display
+    const frame = new Rectangle(x, y, width, height);
+
+    // Create a new Texture that views only this rectangular region
+    // The 'source' is the underlying image data (shared across all frames)
+    const regionTexture = new Texture({
+      source: this.baseTexture.source,
+      frame: frame,
+    });
+
+    // Swap the sprite's texture to show the new frame
+    this.displayObject.texture = regionTexture;
   }
 }
 
@@ -141,6 +216,71 @@ export class PixiRenderer implements Renderer {
           }
 
           renderObject.replaceDisplayObject(sprite);
+        }
+      });
+    }
+
+    return renderObject;
+  }
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * CREATE ANIMATED SPRITE
+   * ═══════════════════════════════════════════════════════════════════════════
+   *
+   * Creates a RenderObject optimized for sprite sheet animation:
+   * - Stores the base texture for later setTextureRegion() calls
+   * - Uses frame dimensions instead of scaling the texture
+   * - Notifies via callback when texture is ready for animation
+   *
+   * Flow:
+   * 1. Create placeholder Graphics immediately (so we have something to show)
+   * 2. Load texture asynchronously
+   * 3. When loaded, store as baseTexture and swap to Sprite
+   * 4. Call onTextureReady so AnimatedSpriteComponent can start animating
+   */
+  createAnimatedSprite(config: AnimatedSpriteConfig): RenderObject {
+    if (!this.worldContainer) {
+      throw new Error('Renderer not initialized. Call init() first.');
+    }
+
+    const { frameWidth, frameHeight } = config;
+    const color = config.color ?? 0xff00ff; // Magenta placeholder
+
+    // Start with a colored rectangle placeholder (sized to one frame)
+    const graphics = new Graphics();
+    graphics.rect(-frameWidth / 2, -frameHeight / 2, frameWidth, frameHeight);
+    graphics.fill(color);
+
+    if (config.alpha !== undefined) {
+      graphics.alpha = config.alpha;
+    }
+    if (config.zIndex !== undefined) {
+      graphics.zIndex = config.zIndex;
+    }
+
+    const renderObject = new PixiRenderObject(graphics, this.worldContainer, config);
+
+    // Load the sprite sheet texture
+    if (config.src) {
+      this.loadTexture(config.src).then((texture) => {
+        if (texture && texture !== Texture.WHITE) {
+          // Create initial sprite showing first frame region
+          const initialFrame = new Rectangle(0, 0, frameWidth, frameHeight);
+          const frameTexture = new Texture({
+            source: texture.source,
+            frame: initialFrame,
+          });
+
+          const sprite = new Sprite(frameTexture);
+          sprite.anchor.set(config.anchor?.[0] ?? 0.5, config.anchor?.[1] ?? 0.5);
+
+          // Store the full sprite sheet as base texture (for setTextureRegion)
+          renderObject.setBaseTexture(texture);
+          renderObject.replaceDisplayObject(sprite);
+
+          // Notify that animation can now start
+          config.onTextureReady?.();
         }
       });
     }

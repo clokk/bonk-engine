@@ -7,6 +7,7 @@ export type {
   RenderObject,
   RendererConfig,
   SpriteConfig,
+  AnimatedSpriteConfig,
 } from './Renderer';
 
 export { PixiRenderer } from './PixiRenderer';

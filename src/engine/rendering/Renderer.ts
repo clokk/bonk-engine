@@ -35,6 +35,22 @@ export interface SpriteConfig {
   zIndex?: number;
 }
 
+/**
+ * Animated sprite configuration.
+ * Extends SpriteConfig with frame dimensions for sprite sheet animation.
+ */
+export interface AnimatedSpriteConfig extends SpriteConfig {
+  /** Width of each frame in the sprite sheet (pixels) */
+  frameWidth: number;
+  /** Height of each frame in the sprite sheet (pixels) */
+  frameHeight: number;
+  /**
+   * Callback invoked when the sprite sheet texture loads successfully.
+   * Used by AnimatedSpriteComponent to know when animation can start.
+   */
+  onTextureReady?: () => void;
+}
+
 /** Abstract render object that represents a visual element */
 export interface RenderObject {
   /** Set position in world space */
@@ -51,6 +67,28 @@ export interface RenderObject {
   zIndex: number;
   /** Destroy and remove from renderer */
   destroy(): void;
+
+  /**
+   * Update the texture region being displayed (for sprite sheets/animation).
+   *
+   * ┌─────────────────────────────────┐
+   * │  Full Sprite Sheet Texture     │
+   * │  ┌─────┬─────┬─────┬─────┐     │
+   * │  │  0  │  1  │  2  │  3  │     │
+   * │  ├─────┼─────┼─────┼─────┤     │
+   * │  │  4  │  5  │ ███ │  7  │     │ ← setTextureRegion selects frame 6
+   * │  └─────┴─────┴─────┴─────┘     │
+   * └─────────────────────────────────┘
+   *
+   * @param x - Left edge of region in pixels (from sheet origin)
+   * @param y - Top edge of region in pixels (from sheet origin)
+   * @param width - Region width in pixels (typically frameWidth)
+   * @param height - Region height in pixels (typically frameHeight)
+   *
+   * WHY optional? Static sprites don't need this method. Only animated
+   * sprites call it, so we make it optional to avoid breaking existing code.
+   */
+  setTextureRegion?(x: number, y: number, width: number, height: number): void;
 }
 
 /** Abstract renderer interface */
@@ -60,6 +98,15 @@ export interface Renderer {
 
   /** Create a sprite render object */
   createSprite(config: SpriteConfig): RenderObject;
+
+  /**
+   * Create an animated sprite render object (for sprite sheet animation).
+   * Similar to createSprite, but:
+   * - Stores the base texture for setTextureRegion() calls
+   * - Uses frameWidth/frameHeight for initial display
+   * - Calls onTextureReady when the sprite sheet loads
+   */
+  createAnimatedSprite(config: AnimatedSpriteConfig): RenderObject;
 
   /** Remove a render object from the scene */
   removeObject(object: RenderObject): void;
