@@ -31,6 +31,8 @@ A Tauri-based editor for bonk-engine with the same panel layout as markdown-edit
 | Input debug overlay | ✅ Complete | Toggleable in viewport, shows axes/buttons/keys |
 | Editor styling | ✅ Complete | Zinc color palette matching markdown-editor |
 | Inspector ↔ Selection binding | ✅ Complete | Inspector reads actual data from selected GameObject |
+| Hierarchy type icons | ✅ Complete | Shows component-based icons for GameObjects |
+| Inspector component badges | ✅ Complete | Shows colored badges for all components |
 | Transform inspector | ✅ Complete | Shows real position, rotation, scale, zIndex (read-only) |
 | Sprite inspector | ✅ Complete | Shows src, anchor, tint, alpha, flip (read-only) |
 | Collider inspector | ✅ Complete | Shows shape, dimensions, offset, isTrigger (read-only) |
@@ -262,6 +264,25 @@ When a scene loads (or reloads via Stop), the viewport automatically positions i
 ### 6. Transform Gizmos
 - Drag handles for position/rotation/scale
 - Snap to grid option
+
+---
+
+## Component Icon & Color System
+
+The editor uses a consistent visual language for component types:
+
+| Component | Hierarchy Icon | Color | Badge |
+|-----------|----------------|-------|-------|
+| Camera2D | Camera | Purple (`purple-400`) | "Camera" |
+| Sprite / AnimatedSprite | Image | Green (`green-400`) | "Sprite" |
+| RigidBody2D | Activity | Orange (`orange-400`) | "RigidBody" |
+| Collider2D | Square | Yellow (`yellow-400`) | "Collider" |
+| AudioSource | Volume2 | Cyan (`cyan-400`) | "Audio" |
+| (default) | Box | Zinc (`zinc-500`) | — |
+
+**Hierarchy:** Shows the "primary" component icon (Camera > Sprite > RigidBody > Audio > default).
+
+**Inspector:** Shows colored badges for ALL components present on the selected GameObject.
 
 ---
 

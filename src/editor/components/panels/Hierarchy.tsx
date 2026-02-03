@@ -1,0 +1,212 @@
+import React, { useState, useMemo } from 'react';
+import { ChevronRight, ChevronDown, Box, Eye, EyeOff, Search, Camera, Image, Activity, Volume2 } from 'lucide-react';
+import { Panel, Input } from '@editor/components/ui';
+import { useEditorStore } from '@editor/store/editorStore';
+import { cn } from '@editor/lib/utils';
+import type { GameObject } from '@engine/GameObject';
+import { Camera2DComponent } from '@engine/components/Camera2DComponent';
+import { SpriteComponent } from '@engine/components/SpriteComponent';
+import { AnimatedSpriteComponent } from '@engine/components/AnimatedSpriteComponent';
+import { RigidBody2DComponent } from '@engine/components/RigidBody2DComponent';
+import { AudioSourceComponent } from '@engine/components/AudioSourceComponent';
+
+function getGameObjectIcon(gameObject: GameObject) {
+  if (gameObject.getComponent(Camera2DComponent)) {
+    return { Icon: Camera, color: 'text-purple-400' };
+  }
+  if (gameObject.getComponent(SpriteComponent) ||
+      gameObject.getComponent(AnimatedSpriteComponent)) {
+    return { Icon: Image, color: 'text-green-400' };
+  }
+  if (gameObject.getComponent(RigidBody2DComponent)) {
+    return { Icon: Activity, color: 'text-orange-400' };
+  }
+  if (gameObject.getComponent(AudioSourceComponent)) {
+    return { Icon: Volume2, color: 'text-cyan-400' };
+  }
+  return { Icon: Box, color: 'text-zinc-500' };
+}
+
+interface HierarchyNodeProps {
+  gameObject: GameObject;
+  depth: number;
+  expandedIds: Set<string>;
+  onToggleExpand: (id: string) => void;
+}
+
+const HierarchyNode: React.FC<HierarchyNodeProps> = ({
+  gameObject,
+  depth,
+  expandedIds,
+  onToggleExpand,
+}) => {
+  const selectedIds = useEditorStore((state) => state.selectedGameObjectIds);
+  const selectGameObject = useEditorStore((state) => state.selectGameObject);
+  const toggleSelection = useEditorStore((state) => state.toggleSelection);
+
+  const isSelected = selectedIds.includes(gameObject.id);
+  const isExpanded = expandedIds.has(gameObject.id);
+  const hasChildren = gameObject.getChildren().length > 0;
+
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (e.ctrlKey || e.metaKey) {
+      toggleSelection(gameObject.id);
+    } else {
+      selectGameObject(gameObject.id);
+    }
+  };
+
+  const handleToggleExpand = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onToggleExpand(gameObject.id);
+  };
+
+  return (
+    <>
+      <div
+        className={cn(
+          'flex items-center gap-1 px-2 py-0.5 rounded cursor-pointer transition-colors select-none',
+          isSelected
+            ? 'bg-sky-400/20 text-sky-400'
+            : 'hover:bg-zinc-800 text-zinc-300',
+          !gameObject.enabled && 'opacity-50'
+        )}
+        style={{ paddingLeft: `${depth * 16 + 8}px` }}
+        onClick={handleClick}
+      >
+        {/* Expand/Collapse */}
+        <button
+          className={cn(
+            'w-4 h-4 flex items-center justify-center',
+            hasChildren ? 'text-zinc-500 hover:text-zinc-300' : 'invisible'
+          )}
+          onClick={handleToggleExpand}
+        >
+          {hasChildren &&
+            (isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />)}
+        </button>
+
+        {/* Icon */}
+        {(() => {
+          const { Icon, color } = getGameObjectIcon(gameObject);
+          return <Icon size={12} className={color} />;
+        })()}
+
+        {/* Name */}
+        <span className="text-xs font-mono truncate flex-1">{gameObject.name}</span>
+
+        {/* Visibility toggle */}
+        <button
+          className="w-4 h-4 flex items-center justify-center text-zinc-500 hover:text-zinc-300"
+          onClick={(e) => {
+            e.stopPropagation();
+            gameObject.enabled = !gameObject.enabled;
+          }}
+        >
+          {gameObject.enabled ? <Eye size={10} /> : <EyeOff size={10} />}
+        </button>
+      </div>
+
+      {/* Children */}
+      {isExpanded &&
+        gameObject.getChildren().map((child) => (
+          <HierarchyNode
+            key={child.id}
+            gameObject={child}
+            depth={depth + 1}
+            expandedIds={expandedIds}
+            onToggleExpand={onToggleExpand}
+          />
+        ))}
+    </>
+  );
+};
+
+export const Hierarchy: React.FC = () => {
+  const clearSelection = useEditorStore((state) => state.clearSelection);
+  const currentScene = useEditorStore((state) => state.currentScene);
+  const [filterQuery, setFilterQuery] = useState('');
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+
+  // Get game objects from the current scene
+  const gameObjects = useMemo(() => {
+    return currentScene?.getGameObjects() ?? [];
+  }, [currentScene]);
+
+  const handleToggleExpand = (id: string) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  // Filter game objects by name
+  const filteredGameObjects = useMemo(() => {
+    if (!filterQuery) return gameObjects;
+
+    const query = filterQuery.toLowerCase();
+    const filterRecursive = (
+      gos: readonly GameObject[]
+    ): GameObject[] => {
+      return gos.filter((go) => {
+        const matches = go.name.toLowerCase().includes(query);
+        const hasMatchingChild = filterRecursive(go.getChildren()).length > 0;
+        return matches || hasMatchingChild;
+      });
+    };
+
+    return filterRecursive(gameObjects);
+  }, [gameObjects, filterQuery]);
+
+  return (
+    <Panel title="Hierarchy" className="h-full">
+      <div className="flex flex-col h-full">
+        {/* Tree View */}
+        <div
+          className="flex-1 min-h-0 overflow-y-auto py-1"
+          onClick={() => clearSelection()}
+        >
+          {filteredGameObjects.length > 0 ? (
+            filteredGameObjects.map((go) => (
+              <HierarchyNode
+                key={go.id}
+                gameObject={go}
+                depth={0}
+                expandedIds={expandedIds}
+                onToggleExpand={handleToggleExpand}
+              />
+            ))
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full text-zinc-500 text-xs">
+              <Search size={24} className="mb-2 opacity-50" />
+              <p>No GameObjects</p>
+              <p className="text-zinc-600 mt-1">Load a scene to see hierarchy</p>
+            </div>
+          )}
+        </div>
+
+        {/* Filter Input */}
+        <div className="p-2 border-t border-zinc-800 bg-zinc-950/50">
+          <div className="relative">
+            <Search
+              size={12}
+              className="absolute left-2 top-1/2 -translate-y-1/2 text-zinc-500"
+            />
+            <Input
+              value={filterQuery}
+              onChange={(e) => setFilterQuery(e.target.value)}
+              placeholder="Filter..."
+              className="h-7 text-xs pl-7"
+            />
+          </div>
+        </div>
+      </div>
+    </Panel>
+  );
+};
