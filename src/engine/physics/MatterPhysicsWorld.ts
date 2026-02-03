@@ -20,7 +20,7 @@ import type { Vector2 } from '../types';
 /** Matter.js body wrapper */
 class MatterBody implements PhysicsBody {
   constructor(
-    public readonly matterBody: Matter.Body,
+    public matterBody: Matter.Body,
     public readonly type: 'dynamic' | 'static' | 'kinematic'
   ) {}
 
@@ -188,47 +188,66 @@ export class MatterPhysicsWorld implements PhysicsWorld {
   }
 
   addCollider(body: PhysicsBody, config: ColliderConfig): void {
-    const matterBody = (body as MatterBody).matterBody;
-    let newBody: Matter.Body | null = null;
-
+    const wrapper = body as MatterBody;
+    const oldBody = wrapper.matterBody;
     const offset = config.offset ?? [0, 0];
+
+    // Preserve properties from old body
+    const bodyOptions: Matter.IBodyDefinition = {
+      isStatic: oldBody.isStatic,
+      isSensor: config.isTrigger,
+      friction: oldBody.friction,
+      restitution: oldBody.restitution,
+      frictionAir: oldBody.frictionAir,
+      angle: oldBody.angle,
+      inertia: oldBody.inertia,
+    };
+
+    // Copy custom gravityScale if present
+    const oldWithGravity = oldBody as Matter.Body & { gravityScale?: number };
+    if (oldWithGravity.gravityScale !== undefined) {
+      (bodyOptions as Matter.IBodyDefinition & { gravityScale?: number }).gravityScale =
+        oldWithGravity.gravityScale;
+    }
+
+    let newBody: Matter.Body | null = null;
+    const posX = oldBody.position.x + offset[0];
+    const posY = oldBody.position.y + offset[1];
 
     switch (config.type) {
       case 'box':
         newBody = Matter.Bodies.rectangle(
-          matterBody.position.x + offset[0],
-          matterBody.position.y + offset[1],
+          posX,
+          posY,
           config.width ?? 32,
           config.height ?? 32,
-          { isSensor: config.isTrigger }
+          bodyOptions
         );
         break;
 
       case 'circle':
-        newBody = Matter.Bodies.circle(
-          matterBody.position.x + offset[0],
-          matterBody.position.y + offset[1],
-          config.radius ?? 16,
-          { isSensor: config.isTrigger }
-        );
+        newBody = Matter.Bodies.circle(posX, posY, config.radius ?? 16, bodyOptions);
         break;
 
       case 'polygon':
         if (config.vertices && config.vertices.length >= 3) {
           const vertices = config.vertices.map((v) => ({ x: v[0], y: v[1] }));
-          newBody = Matter.Bodies.fromVertices(
-            matterBody.position.x + offset[0],
-            matterBody.position.y + offset[1],
-            [vertices],
-            { isSensor: config.isTrigger }
-          );
+          newBody = Matter.Bodies.fromVertices(posX, posY, [vertices], bodyOptions);
         }
         break;
     }
 
     if (newBody) {
-      // Replace the body parts with the new collider
-      Matter.Body.setParts(matterBody, [newBody]);
+      // Remove old body from world and tracking
+      Matter.Composite.remove(this.engine.world, oldBody);
+      this.bodies.delete(oldBody.id);
+
+      // Add new body to world and tracking
+      Matter.Composite.add(this.engine.world, newBody);
+      this.bodies.set(newBody.id, wrapper);
+
+      // Update the wrapper to point to new body
+      (wrapper as { matterBody: Matter.Body }).matterBody = newBody;
     }
   }
 

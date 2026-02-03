@@ -7,6 +7,19 @@ import { GameObject, type Scene as IScene } from './GameObject';
 import { GlobalEvents, EngineEvents } from './EventSystem';
 import type { SceneJson, SceneSettingsJson, Vector2 } from './types';
 import { DEFAULT_SCENE_SETTINGS } from './types';
+import {
+  createPhysicsWorld,
+  type PhysicsWorld,
+  type PhysicsBody,
+  type CollisionEvent,
+} from './physics';
+import { Time } from './Time';
+
+/** Contact info passed to collision callbacks */
+export interface ContactInfo {
+  point: Vector2;
+  normal: Vector2;
+}
 
 export class Scene implements IScene {
   /** Scene name */
@@ -18,11 +31,20 @@ export class Scene implements IScene {
   /** Scene settings */
   readonly settings: SceneSettingsJson;
 
+  /** Physics world for this scene */
+  readonly physicsWorld: PhysicsWorld;
+
   /** Root GameObjects */
   private gameObjects: GameObject[] = [];
 
   /** GameObjects by ID for fast lookup */
   private gameObjectsById = new Map<string, GameObject>();
+
+  /** Physics body to GameObject mapping */
+  private bodyToGameObject = new Map<string, GameObject>();
+
+  /** Cleanup functions for physics event listeners */
+  private physicsCleanup: (() => void)[] = [];
 
   /** GameObjects pending destruction */
   private pendingDestroy: Set<GameObject> = new Set();
@@ -34,6 +56,75 @@ export class Scene implements IScene {
     this.name = name;
     this.version = version;
     this.settings = { ...DEFAULT_SCENE_SETTINGS, ...settings };
+
+    // Initialize physics world with scene gravity
+    this.physicsWorld = createPhysicsWorld('matter', {
+      gravity: this.gravity,
+    });
+
+    // Set up collision routing
+    this.physicsCleanup.push(
+      this.physicsWorld.onCollisionStart((event) => {
+        this.handleCollision(event, 'enter');
+      })
+    );
+
+    this.physicsCleanup.push(
+      this.physicsWorld.onCollisionEnd((event) => {
+        this.handleCollision(event, 'exit');
+      })
+    );
+
+    console.log(`[Scene] Physics world initialized for "${name}"`);
+  }
+
+  /** Handle collision events and route to behaviors */
+  private handleCollision(
+    event: CollisionEvent,
+    type: 'enter' | 'exit'
+  ): void {
+    const goA = this.bodyToGameObject.get(event.bodyA.id);
+    const goB = this.bodyToGameObject.get(event.bodyB.id);
+
+    if (!goA || !goB) return;
+
+    const contact: ContactInfo =
+      event.contacts[0] ?? { point: [0, 0], normal: [0, 0] };
+
+    // Route to all behaviors on both GameObjects
+    for (const behavior of goA.getAllBehaviors()) {
+      if (!behavior.enabled) continue;
+      if (type === 'enter') {
+        behavior.onCollisionEnter?.(goB, contact);
+      } else {
+        behavior.onCollisionExit?.(goB);
+      }
+    }
+
+    // Flip normal for the other object
+    const flippedContact: ContactInfo = {
+      point: contact.point,
+      normal: [-contact.normal[0], -contact.normal[1]] as Vector2,
+    };
+
+    for (const behavior of goB.getAllBehaviors()) {
+      if (!behavior.enabled) continue;
+      if (type === 'enter') {
+        behavior.onCollisionEnter?.(goA, flippedContact);
+      } else {
+        behavior.onCollisionExit?.(goA);
+      }
+    }
+  }
+
+  /** Register a physics body for collision routing */
+  registerPhysicsBody(body: PhysicsBody, gameObject: GameObject): void {
+    this.bodyToGameObject.set(body.id, gameObject);
+  }
+
+  /** Unregister a physics body */
+  unregisterPhysicsBody(body: PhysicsBody): void {
+    this.bodyToGameObject.delete(body.id);
   }
 
   /** Get gravity setting */
@@ -168,9 +259,66 @@ export class Scene implements IScene {
 
   /** Fixed update all GameObjects */
   fixedUpdate(): void {
+    // Sync kinematic bodies TO physics before stepping
+    this.syncKinematicBodiesToPhysics();
+
+    // Step the physics simulation
+    this.physicsWorld.step(Time.fixedDeltaTime);
+
+    // Sync dynamic bodies FROM physics after stepping
+    this.syncDynamicBodiesFromPhysics();
+
+    // Then run behavior fixedUpdate
     for (const go of this.gameObjects) {
       go.fixedUpdate();
     }
+  }
+
+  /** Interface for RigidBody2D component (avoids circular import) */
+  private isRigidBody2D(
+    component: unknown
+  ): component is {
+    type: string;
+    bodyType: 'dynamic' | 'static' | 'kinematic';
+    syncToPhysics: () => void;
+    syncFromPhysics: () => void;
+  } {
+    return (
+      typeof component === 'object' &&
+      component !== null &&
+      'type' in component &&
+      (component as { type: string }).type === 'RigidBody2D'
+    );
+  }
+
+  /** Sync kinematic body transforms to physics world */
+  private syncKinematicBodiesToPhysics(): void {
+    const syncRecursive = (gameObjects: readonly GameObject[]) => {
+      for (const go of gameObjects) {
+        for (const component of go.getAllComponents()) {
+          if (this.isRigidBody2D(component) && component.bodyType === 'kinematic') {
+            component.syncToPhysics();
+          }
+        }
+        syncRecursive(go.getChildren());
+      }
+    };
+    syncRecursive(this.gameObjects);
+  }
+
+  /** Sync dynamic body positions from physics world to transforms */
+  private syncDynamicBodiesFromPhysics(): void {
+    const syncRecursive = (gameObjects: readonly GameObject[]) => {
+      for (const go of gameObjects) {
+        for (const component of go.getAllComponents()) {
+          if (this.isRigidBody2D(component) && component.bodyType === 'dynamic') {
+            component.syncFromPhysics();
+          }
+        }
+        syncRecursive(go.getChildren());
+      }
+    };
+    syncRecursive(this.gameObjects);
   }
 
   /** Late update all GameObjects */
@@ -189,8 +337,16 @@ export class Scene implements IScene {
     }
     this.gameObjects = [];
     this.gameObjectsById.clear();
+    this.bodyToGameObject.clear();
     this.pendingDestroy.clear();
     this.started = false;
+
+    // Clean up physics
+    for (const cleanup of this.physicsCleanup) {
+      cleanup();
+    }
+    this.physicsCleanup = [];
+    this.physicsWorld.destroy();
   }
 
   /** Create scene from JSON */

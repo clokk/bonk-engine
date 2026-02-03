@@ -1,43 +1,75 @@
 /**
  * PlayerController - Example behavior for player movement.
- * Demonstrates input handling using the Input system and coroutines.
+ * Demonstrates physics-based movement, input handling, and collision callbacks.
  */
 
 import { Behavior } from '../src/engine/Behavior';
+import type { GameObject } from '../src/engine/GameObject';
+import type { ContactInfo } from '../src/engine/Scene';
 
 export default class PlayerController extends Behavior {
   /** Movement speed in pixels per second */
   speed: number = 200;
 
-  /** Jump force */
+  /** Jump impulse strength */
   jumpForce: number = 400;
 
   /** Is the player grounded? */
-  isGrounded: boolean = true;
-
-  /** Current velocity */
-  private velocity: [number, number] = [0, 0];
+  isGrounded: boolean = false;
 
   start(): void {
     console.log(`PlayerController started on ${this.gameObject.name}`);
+    if (!this.rigidbody) {
+      console.warn('[PlayerController] No RigidBody2D found - physics movement disabled');
+    }
   }
 
-  update(): void {
-    // Get movement from axes (smoothed)
-    const moveX = this.getAxis('horizontal');
-    const moveY = this.getAxis('vertical');
+  fixedUpdate(): void {
+    const rb = this.rigidbody;
+    if (!rb) return;
 
-    // Apply movement
-    this.transform.position[0] += moveX * this.speed * this.deltaTime;
-    this.transform.position[1] += moveY * this.speed * this.deltaTime;
+    // Get horizontal input
+    const moveX = this.getAxisRaw('horizontal');
 
-    // Handle jump - only triggers once per press thanks to getButtonDown
-    if (this.getButtonDown('jump') && this.isGrounded) {
-      this.velocity[1] = -this.jumpForce;
+    // Set horizontal velocity while preserving vertical velocity (gravity)
+    // Matter.js velocity is in pixels per step, so multiply by fixedDeltaTime
+    const [, vy] = rb.velocity;
+    rb.velocity = [moveX * this.speed * this.fixedDeltaTime, vy];
+
+    // Handle jump - getButtonDown only fires on the frame the button is first pressed
+    const jumpPressed = this.getButtonDown('jump');
+    if (jumpPressed) {
+      console.log('[PlayerController] Jump pressed, isGrounded:', this.isGrounded);
+    }
+
+    if (jumpPressed && this.isGrounded) {
+      // Set upward velocity (scale like horizontal movement)
+      const [vx] = rb.velocity;
+      const jumpVelocity = -this.jumpForce * this.fixedDeltaTime;
+      console.log('[PlayerController] Jumping with velocity:', jumpVelocity);
+      rb.velocity = [vx, jumpVelocity];
       this.isGrounded = false;
 
       // Start jump coroutine for visual feedback
       this.startCoroutine(this.jumpSquash());
+    }
+  }
+
+  /** Called when player collides with something */
+  onCollisionEnter(other: GameObject, contact: ContactInfo): void {
+    // Check if we landed on something (contact normal pointing up)
+    // Normal pointing up means we hit something below us
+    if (contact.normal[1] < -0.5) {
+      this.isGrounded = true;
+      console.log(`[PlayerController] Landed on ${other.name}`);
+    }
+  }
+
+  /** Called when player stops colliding */
+  onCollisionExit(other: GameObject): void {
+    // Simple ground check - could be improved with raycast
+    if (other.tag === 'Ground') {
+      this.isGrounded = false;
     }
   }
 

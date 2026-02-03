@@ -60,6 +60,10 @@ export {
 // Physics
 export * from './physics';
 
+// Components (registers all built-in components)
+import './components';
+export * from './components';
+
 // Rendering
 export * from './rendering';
 

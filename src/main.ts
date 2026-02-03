@@ -123,13 +123,15 @@ async function main(): Promise<void> {
       lastTime = now;
 
       Time.update(dt);
-      Input.update();
 
-      // Update scene
+      // Update scene (Input.update must come AFTER so getButtonDown works)
       scene.fixedUpdate();
       scene.update();
       scene.lateUpdate();
       scene.processPendingDestroy();
+
+      // Clear per-frame input state at END of frame
+      Input.update();
 
       // Render (PixiJS handles actual drawing via its internal loop)
       renderer.render();

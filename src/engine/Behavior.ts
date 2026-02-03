@@ -18,6 +18,10 @@ import { Time } from './Time';
 import { Input } from './Input';
 import { EventEmitter } from './EventSystem';
 import type { Vector2 } from './types';
+import type { ContactInfo } from './Scene';
+
+// Forward declaration to avoid circular dependency
+type RigidBody2DComponent = import('./components/RigidBody2DComponent').RigidBody2DComponent;
 
 export abstract class Behavior {
   /** The GameObject this behavior is attached to */
@@ -42,6 +46,15 @@ export abstract class Behavior {
   /** Quick access to transform */
   get transform(): Transform {
     return this.gameObject.transform;
+  }
+
+  /** Quick access to RigidBody2D component */
+  get rigidbody(): RigidBody2DComponent | undefined {
+    // Find by type string to avoid circular dependency
+    const component = this.gameObject
+      .getAllComponents()
+      .find((c) => c.type === 'RigidBody2D');
+    return component as RigidBody2DComponent | undefined;
   }
 
   // ==================== Lifecycle Hooks ====================
@@ -81,6 +94,30 @@ export abstract class Behavior {
    * Use for cleanup.
    */
   onDestroy(): void {}
+
+  // ==================== Collision Callbacks ====================
+
+  /**
+   * Called when this object starts colliding with another.
+   * Requires a RigidBody2D and Collider2D on this GameObject.
+   */
+  onCollisionEnter?(other: GameObject, contact: ContactInfo): void;
+
+  /**
+   * Called when this object stops colliding with another.
+   */
+  onCollisionExit?(other: GameObject): void;
+
+  /**
+   * Called when this object enters a trigger collider.
+   * The other object must have isTrigger: true on its Collider2D.
+   */
+  onTriggerEnter?(other: GameObject): void;
+
+  /**
+   * Called when this object exits a trigger collider.
+   */
+  onTriggerExit?(other: GameObject): void;
 
   // ==================== Coroutines ====================
 

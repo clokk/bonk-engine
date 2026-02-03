@@ -20,6 +20,14 @@ A simple demo scene showcasing the Bonk Engine MDX format.
       src="./sprites/player.png"
       anchor={[0.5, 0.5]}
     />
+    <RigidBody2D
+      bodyType="dynamic"
+      gravityScale={1}
+      fixedRotation={true}
+    />
+    <Collider2D
+      shape={{ type: 'box', width: 48, height: 64 }}
+    />
     <Behavior
       src="./behaviors/PlayerController.ts"
       props={{ speed: 250, jumpForce: 500 }}
@@ -75,6 +83,12 @@ A simple demo scene showcasing the Bonk Engine MDX format.
     <Sprite
       src="./sprites/ground.png"
       anchor={[0.5, 0.5]}
+    />
+    <RigidBody2D
+      bodyType="static"
+    />
+    <Collider2D
+      shape={{ type: 'box', width: 600, height: 40 }}
     />
   </GameObject>
 
