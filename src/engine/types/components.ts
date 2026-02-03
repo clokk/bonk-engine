@@ -69,7 +69,27 @@ export interface Collider2DJson extends ComponentJson {
   mask?: string[];
 }
 
-/** Camera component - viewport control */
+/** Camera2D component - viewport control */
+export interface Camera2DJson extends ComponentJson {
+  type: 'Camera2D';
+  zoom?: number;
+  isMain?: boolean;
+  target?: string;
+  followSmoothing?: number;
+  offset?: Vector2;
+  bounds?: {
+    minX: number;
+    minY: number;
+    maxX: number;
+    maxY: number;
+  };
+  deadzone?: {
+    width: number;
+    height: number;
+  };
+}
+
+/** Camera component - viewport control (legacy, use Camera2D) */
 export interface CameraJson extends ComponentJson {
   type: 'Camera';
   zoom?: number;
@@ -131,6 +151,7 @@ export type BuiltInComponentJson =
   | AnimatedSpriteJson
   | RigidBody2DJson
   | Collider2DJson
+  | Camera2DJson
   | CameraJson
   | AudioSourceJson
   | ParticleEmitterJson

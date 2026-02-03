@@ -75,9 +75,16 @@ export class PixiRenderer implements Renderer {
   private app: Application | null = null;
   private worldContainer: Container | null = null;
   private textureCache = new Map<string, Texture>();
+  private viewportWidth: number = 800;
+  private viewportHeight: number = 600;
+  private cameraX: number = 0;
+  private cameraY: number = 0;
+  private cameraZoom: number = 1;
 
   async init(config: RendererConfig): Promise<HTMLCanvasElement> {
     this.app = new Application();
+    this.viewportWidth = config.width;
+    this.viewportHeight = config.height;
 
     await this.app.init({
       width: config.width,
@@ -154,6 +161,10 @@ export class PixiRenderer implements Renderer {
   resize(width: number, height: number): void {
     if (this.app) {
       this.app.renderer.resize(width, height);
+      this.viewportWidth = width;
+      this.viewportHeight = height;
+      // Re-apply camera position after resize
+      this.updateWorldContainer();
     }
   }
 
@@ -171,6 +182,36 @@ export class PixiRenderer implements Renderer {
       this.app = null;
     }
     this.textureCache.clear();
+  }
+
+  setCameraPosition(x: number, y: number): void {
+    this.cameraX = x;
+    this.cameraY = y;
+    this.updateWorldContainer();
+  }
+
+  setCameraZoom(zoom: number): void {
+    this.cameraZoom = zoom;
+    this.updateWorldContainer();
+  }
+
+  getViewportSize(): { width: number; height: number } {
+    return { width: this.viewportWidth, height: this.viewportHeight };
+  }
+
+  /** Update world container transform based on camera position and zoom */
+  private updateWorldContainer(): void {
+    if (!this.worldContainer) return;
+
+    // Apply zoom
+    this.worldContainer.scale.set(this.cameraZoom, this.cameraZoom);
+
+    // Offset world container so camera position is at viewport center
+    // The camera looks at (cameraX, cameraY), so we move the world in the opposite direction
+    this.worldContainer.position.set(
+      this.viewportWidth / 2 - this.cameraX * this.cameraZoom,
+      this.viewportHeight / 2 - this.cameraY * this.cameraZoom
+    );
   }
 
   /** Load a texture with caching */

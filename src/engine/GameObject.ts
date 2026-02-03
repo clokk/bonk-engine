@@ -261,6 +261,9 @@ export class GameObject {
   lateUpdate(): void {
     if (!this.enabled) return;
 
+    for (const component of this.components) {
+      if (component.enabled) component.lateUpdate();
+    }
     for (const behavior of this.behaviors) {
       if (behavior.enabled) behavior.lateUpdate();
     }

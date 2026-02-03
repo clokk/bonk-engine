@@ -75,4 +75,13 @@ export interface Renderer {
 
   /** Destroy the renderer and clean up resources */
   destroy(): void;
+
+  /** Set camera position (world coordinates) */
+  setCameraPosition(x: number, y: number): void;
+
+  /** Set camera zoom level */
+  setCameraZoom(zoom: number): void;
+
+  /** Get viewport size */
+  getViewportSize(): { width: number; height: number };
 }

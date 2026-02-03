@@ -34,6 +34,9 @@ export abstract class Component {
   /** Called every frame */
   update(): void {}
 
+  /** Called after all updates (useful for camera follow) */
+  lateUpdate(): void {}
+
   /** Called at fixed timestep (for physics) */
   fixedUpdate(): void {}
 

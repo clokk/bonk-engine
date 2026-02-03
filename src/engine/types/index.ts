@@ -13,6 +13,7 @@ export type {
   AnimatedSpriteJson,
   RigidBody2DJson,
   Collider2DJson,
+  Camera2DJson,
   CameraJson,
   AudioSourceJson,
   ParticleEmitterJson,

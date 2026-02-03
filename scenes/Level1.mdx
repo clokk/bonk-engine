@@ -9,6 +9,18 @@ A simple demo scene showcasing the Bonk Engine MDX format.
   />
 
   <GameObject
+    name="MainCamera"
+    position={[400, 300]}
+  >
+    <Camera2D
+      target="Player"
+      zoom={1}
+      followSmoothing={8}
+      offset={[0, -50]}
+    />
+  </GameObject>
+
+  <GameObject
     name="Player"
     tag="Player"
     position={[400, 300]}
