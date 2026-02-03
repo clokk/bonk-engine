@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { FileNode, readProjectTree } from '@editor/lib/filesystem';
+import { FileNode, readProjectTree, watchProjectTree } from '@editor/lib/filesystem';
 
 export interface UseFileTreeResult {
   fileTree: FileNode[];
@@ -71,6 +71,34 @@ export function useFileTree(): UseFileTreeResult {
       cancelled = true;
     };
   }, []);
+
+  // Set up file watcher after initial load
+  useEffect(() => {
+    let unwatchFn: (() => void) | null = null;
+    let cancelled = false;
+
+    const setupWatcher = async () => {
+      try {
+        unwatchFn = await watchProjectTree(() => {
+          if (!cancelled) {
+            refresh();
+          }
+        });
+      } catch (err) {
+        // File watching not available (browser mode or permission denied)
+        if (!cancelled) {
+          console.warn('[useFileTree] File watching not available:', err);
+        }
+      }
+    };
+
+    setupWatcher();
+
+    return () => {
+      cancelled = true;
+      unwatchFn?.();
+    };
+  }, [refresh]);
 
   return { fileTree, isLoading, error, refresh };
 }

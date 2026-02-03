@@ -135,3 +135,54 @@ export async function readProjectTree(): Promise<FileNode[]> {
 
   return nodes;
 }
+
+/**
+ * Set up file watchers on project directories.
+ * Calls onChange when files are created, modified, or removed.
+ * Returns an unwatch function for cleanup.
+ */
+export async function watchProjectTree(
+  onChange: () => void,
+  options?: { debounceMs?: number }
+): Promise<() => void> {
+  const { watch } = await import('@tauri-apps/plugin-fs');
+  const projectRoot = await getProjectRoot();
+  const debounceMs = options?.debounceMs ?? 300;
+
+  const unwatchFns: (() => void)[] = [];
+
+  for (const dir of PROJECT_DIRS) {
+    const fullPath = `${projectRoot}/${dir}`;
+
+    try {
+      const unwatch = await watch(
+        fullPath,
+        (event) => {
+          // Only trigger on meaningful file changes
+          const eventType = event.type;
+          if (
+            typeof eventType === 'object' &&
+            ('create' in eventType || 'modify' in eventType || 'remove' in eventType)
+          ) {
+            onChange();
+          }
+        },
+        {
+          recursive: true,
+          delayMs: debounceMs,
+        }
+      );
+      unwatchFns.push(unwatch);
+    } catch (err) {
+      // Directory might not exist yet, that's ok
+      console.warn(`[filesystem] Could not watch ${dir}:`, err);
+    }
+  }
+
+  // Return combined unwatch function
+  return () => {
+    for (const unwatch of unwatchFns) {
+      unwatch();
+    }
+  };
+}
