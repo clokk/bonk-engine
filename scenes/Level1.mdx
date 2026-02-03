@@ -20,6 +20,16 @@ A simple demo scene showcasing the Bonk Engine MDX format.
     />
   </GameObject>
 
+  <GameObject name="BackgroundMusic">
+    <AudioSource
+      src="./audio/music.mp3"
+      category="music"
+      loop={true}
+      playOnAwake={true}
+      volume={0.3}
+    />
+  </GameObject>
+
   <GameObject
     name="Player"
     tag="Player"

@@ -368,6 +368,10 @@ export class PixiRenderer implements Renderer {
     return { width: this.viewportWidth, height: this.viewportHeight };
   }
 
+  getCameraPosition(): { x: number; y: number } {
+    return { x: this.cameraX, y: this.cameraY };
+  }
+
   // ==================== UI Support ====================
 
   getUIContainer(): Container | null {

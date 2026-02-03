@@ -132,6 +132,9 @@ export interface Renderer {
   /** Get viewport size */
   getViewportSize(): { width: number; height: number };
 
+  /** Get current camera position */
+  getCameraPosition(): { x: number; y: number };
+
   // ==================== UI Support ====================
 
   /**

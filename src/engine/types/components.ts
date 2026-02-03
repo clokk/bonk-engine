@@ -104,6 +104,8 @@ export interface AudioSourceJson extends ComponentJson {
   volume?: number;
   loop?: boolean;
   playOnAwake?: boolean;
+  /** Volume category: 'music' or 'sfx' */
+  category?: 'music' | 'sfx';
   spatial?: boolean;
   minDistance?: number;
   maxDistance?: number;

@@ -60,6 +60,9 @@ export {
 // Physics
 export * from './physics';
 
+// Audio
+export * from './audio';
+
 // Components (registers all built-in components)
 import './components';
 export * from './components';
