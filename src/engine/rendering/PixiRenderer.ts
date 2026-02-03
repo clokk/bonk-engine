@@ -149,6 +149,26 @@ class PixiRenderObject implements RenderObject {
 export class PixiRenderer implements Renderer {
   private app: Application | null = null;
   private worldContainer: Container | null = null;
+  /**
+   * UI container for screen-space UI elements.
+   *
+   * ┌─────────────────────────────────────────────────────────────────┐
+   * │                    PIXI.JS APPLICATION                          │
+   * ├─────────────────────────────────────────────────────────────────┤
+   * │  app.stage                                                      │
+   * │  ├── worldContainer (camera-affected)                           │
+   * │  │   └── Game sprites, tilemaps, etc.                          │
+   * │  │                                                              │
+   * │  └── uiContainer (screen-space, fixed at 0,0)                  │
+   * │      └── UI elements (panels, text, buttons)                   │
+   * └─────────────────────────────────────────────────────────────────┘
+   *
+   * WHY separate containers?
+   * - worldContainer is transformed by camera (position, zoom)
+   * - uiContainer stays fixed at screen origin, ignores camera
+   * - UI always renders on top of game world
+   */
+  private uiContainer: Container | null = null;
   private textureCache = new Map<string, Texture>();
   private viewportWidth: number = 800;
   private viewportHeight: number = 600;
@@ -174,6 +194,11 @@ export class PixiRenderer implements Renderer {
     this.worldContainer = new Container();
     this.worldContainer.sortableChildren = true;
     this.app.stage.addChild(this.worldContainer);
+
+    // Create UI container (added after worldContainer so it renders on top)
+    this.uiContainer = new Container();
+    this.uiContainer.sortableChildren = true;
+    this.app.stage.addChild(this.uiContainer);
 
     return this.app.canvas as HTMLCanvasElement;
   }
@@ -313,6 +338,10 @@ export class PixiRenderer implements Renderer {
   }
 
   destroy(): void {
+    if (this.uiContainer) {
+      this.uiContainer.destroy({ children: true });
+      this.uiContainer = null;
+    }
     if (this.worldContainer) {
       this.worldContainer.destroy({ children: true });
       this.worldContainer = null;
@@ -337,6 +366,24 @@ export class PixiRenderer implements Renderer {
 
   getViewportSize(): { width: number; height: number } {
     return { width: this.viewportWidth, height: this.viewportHeight };
+  }
+
+  // ==================== UI Support ====================
+
+  getUIContainer(): Container | null {
+    return this.uiContainer;
+  }
+
+  addToUI(displayObject: Container): void {
+    if (!this.uiContainer) {
+      throw new Error('Renderer not initialized. Call init() first.');
+    }
+    this.uiContainer.addChild(displayObject);
+  }
+
+  removeFromUI(displayObject: Container): void {
+    if (!this.uiContainer) return;
+    this.uiContainer.removeChild(displayObject);
   }
 
   /** Update world container transform based on camera position and zoom */

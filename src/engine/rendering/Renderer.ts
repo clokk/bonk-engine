@@ -131,4 +131,23 @@ export interface Renderer {
 
   /** Get viewport size */
   getViewportSize(): { width: number; height: number };
+
+  // ==================== UI Support ====================
+
+  /**
+   * Get the UI container for screen-space UI elements.
+   * UI container is rendered after worldContainer and is not affected by camera.
+   */
+  getUIContainer(): import('pixi.js').Container | null;
+
+  /**
+   * Add a display object to the UI layer.
+   * Objects added here render in screen-space, unaffected by camera.
+   */
+  addToUI(displayObject: import('pixi.js').Container): void;
+
+  /**
+   * Remove a display object from the UI layer.
+   */
+  removeFromUI(displayObject: import('pixi.js').Container): void;
 }

@@ -24,6 +24,10 @@ import {
 import { getRenderer } from './engine/rendering';
 import type { Renderer } from './engine/rendering';
 
+// Import UI test
+import { createUITest, updateUITest } from './tests/ui-test';
+import type { UIManager } from './engine/ui';
+
 // Debug overlay element
 let debugOverlay: HTMLDivElement | null = null;
 
@@ -114,6 +118,12 @@ async function main(): Promise<void> {
     // Set up hot reload for this scene
     setHotReloadScene(scene);
 
+    // ============================================================
+    // Initialize UI Test
+    // ============================================================
+    const { ui, state: uiState, cleanup: uiCleanup } = createUITest(renderer);
+    console.log('UI Test initialized');
+
     // Game loop
     let lastTime = performance.now();
 
@@ -124,7 +134,18 @@ async function main(): Promise<void> {
 
       Time.update(dt);
 
+      // ============================================================
+      // UI Input Processing (BEFORE game input)
+      // Returns true if UI consumed the input (e.g., button click)
+      // ============================================================
+      const uiConsumed = updateUITest(ui);
+
       // Update scene (Input.update must come AFTER so getButtonDown works)
+      // Only process game input if UI didn't consume it
+      if (!uiConsumed) {
+        // Game-specific input handling could go here
+      }
+
       scene.fixedUpdate();
       scene.update();
       scene.lateUpdate();
@@ -148,6 +169,11 @@ async function main(): Promise<void> {
     gameLoop();
 
     console.log('Game loop started');
+
+    // Clean up on page unload
+    window.addEventListener('beforeunload', () => {
+      uiCleanup();
+    });
   } catch (error) {
     console.error('Failed to start game:', error);
   }
