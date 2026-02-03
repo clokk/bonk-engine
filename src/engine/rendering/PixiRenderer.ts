@@ -9,11 +9,31 @@ import type { Renderer, RendererConfig, SpriteConfig, RenderObject } from './Ren
 class PixiRenderObject implements RenderObject {
   private displayObject: Sprite | Graphics;
   private container: Container;
+  private config: SpriteConfig;
 
-  constructor(displayObject: Sprite | Graphics, container: Container) {
+  constructor(displayObject: Sprite | Graphics, container: Container, config: SpriteConfig) {
     this.displayObject = displayObject;
     this.container = container;
+    this.config = config;
     container.addChild(displayObject);
+  }
+
+  /** Replace the display object (used when texture loads) */
+  replaceDisplayObject(newObject: Sprite | Graphics): void {
+    // Copy properties from old to new
+    newObject.position.copyFrom(this.displayObject.position);
+    newObject.rotation = this.displayObject.rotation;
+    newObject.scale.copyFrom(this.displayObject.scale);
+    newObject.alpha = this.displayObject.alpha;
+    newObject.visible = this.displayObject.visible;
+    newObject.zIndex = this.displayObject.zIndex;
+
+    // Swap in container
+    const index = this.container.getChildIndex(this.displayObject);
+    this.container.removeChildAt(index);
+    this.displayObject.destroy();
+    this.container.addChildAt(newObject, index);
+    this.displayObject = newObject;
   }
 
   setPosition(x: number, y: number): void {
@@ -81,53 +101,44 @@ export class PixiRenderer implements Renderer {
       throw new Error('Renderer not initialized. Call init() first.');
     }
 
-    let displayObject: Sprite | Graphics;
+    const width = config.width ?? 32;
+    const height = config.height ?? 32;
+    const color = config.color ?? 0xff00ff; // Magenta default
 
-    if (config.src) {
-      // Create a sprite with texture
-      // Start with a placeholder and load texture async
-      const sprite = new Sprite(Texture.WHITE);
-      sprite.width = config.width ?? 32;
-      sprite.height = config.height ?? 32;
-
-      // Load texture asynchronously
-      this.loadTexture(config.src).then((texture) => {
-        sprite.texture = texture;
-        // Reset size if no explicit dimensions were given
-        if (!config.width && !config.height) {
-          sprite.width = texture.width;
-          sprite.height = texture.height;
-        }
-      });
-
-      displayObject = sprite;
-    } else {
-      // Create a colored rectangle placeholder
-      const graphics = new Graphics();
-      const width = config.width ?? 32;
-      const height = config.height ?? 32;
-      const color = config.color ?? 0xff00ff; // Magenta default
-
-      graphics.rect(-width / 2, -height / 2, width, height);
-      graphics.fill(color);
-
-      displayObject = graphics;
-    }
-
-    // Set anchor for sprites
-    if (displayObject instanceof Sprite && config.anchor) {
-      displayObject.anchor.set(config.anchor[0], config.anchor[1]);
-    }
+    // Always start with a colored rectangle placeholder
+    const graphics = new Graphics();
+    graphics.rect(-width / 2, -height / 2, width, height);
+    graphics.fill(color);
 
     // Set initial properties
     if (config.alpha !== undefined) {
-      displayObject.alpha = config.alpha;
+      graphics.alpha = config.alpha;
     }
     if (config.zIndex !== undefined) {
-      displayObject.zIndex = config.zIndex;
+      graphics.zIndex = config.zIndex;
     }
 
-    return new PixiRenderObject(displayObject, this.worldContainer);
+    const renderObject = new PixiRenderObject(graphics, this.worldContainer, config);
+
+    // If there's a src, try to load the texture and swap to a Sprite on success
+    if (config.src) {
+      this.loadTexture(config.src).then((texture) => {
+        if (texture && texture !== Texture.WHITE) {
+          const sprite = new Sprite(texture);
+          sprite.anchor.set(config.anchor?.[0] ?? 0.5, config.anchor?.[1] ?? 0.5);
+
+          // Use explicit dimensions if provided, otherwise use texture size
+          if (config.width || config.height) {
+            sprite.width = width;
+            sprite.height = height;
+          }
+
+          renderObject.replaceDisplayObject(sprite);
+        }
+      });
+    }
+
+    return renderObject;
   }
 
   removeObject(object: RenderObject): void {
@@ -163,7 +174,7 @@ export class PixiRenderer implements Renderer {
   }
 
   /** Load a texture with caching */
-  private async loadTexture(src: string): Promise<Texture> {
+  private async loadTexture(src: string): Promise<Texture | null> {
     if (this.textureCache.has(src)) {
       return this.textureCache.get(src)!;
     }
@@ -172,9 +183,10 @@ export class PixiRenderer implements Renderer {
       const texture = await Assets.load(src);
       this.textureCache.set(src, texture);
       return texture;
-    } catch (error) {
-      console.warn(`Failed to load texture: ${src}`, error);
-      return Texture.WHITE;
+    } catch {
+      // Texture not found - this is normal during development when using placeholders
+      // Use colored rectangles instead (already handled by createSprite)
+      return null;
     }
   }
 }

@@ -14,6 +14,14 @@ const TAG_COLORS: Record<string, number> = {
   Enemy: 0xff0000, // Red
   Collectible: 0xffff00, // Yellow
   Platform: 0x888888, // Gray
+  Ground: 0x8b4513, // Brown
+};
+
+/** Default size mapping for different game object tags */
+const TAG_SIZES: Record<string, { width: number; height: number }> = {
+  Player: { width: 48, height: 64 },
+  Enemy: { width: 48, height: 48 },
+  Ground: { width: 600, height: 40 },
 };
 
 /** Default placeholder color */
@@ -69,11 +77,16 @@ export class SpriteComponent extends Component {
     const tag = this.gameObject.tag;
     const color = tag && TAG_COLORS[tag] ? TAG_COLORS[tag] : DEFAULT_COLOR;
 
+    // Determine size - use explicit size, or tag default, or component default
+    const tagSize = tag && TAG_SIZES[tag] ? TAG_SIZES[tag] : null;
+    const width = this.width !== 32 ? this.width : (tagSize?.width ?? 48);
+    const height = this.height !== 32 ? this.height : (tagSize?.height ?? 48);
+
     // Create render object
     this.renderObject = renderer.createSprite({
       src: this.src || undefined,
-      width: this.width,
-      height: this.height,
+      width,
+      height,
       color,
       anchor: this.anchor,
       alpha: this.alpha,
