@@ -1,0 +1,81 @@
+# Level 1 - Demo Scene
+
+A simple demo scene showcasing the Bonk Engine MDX format.
+
+<Scene>
+  <Scene.Settings
+    gravity={[0, 980]}
+    backgroundColor="#2a1a4a"
+  />
+
+  <GameObject
+    name="Player"
+    tag="Player"
+    position={[400, 300]}
+    rotation={0}
+    scale={[1, 1]}
+    zIndex={10}
+  >
+    <Sprite
+      src="./sprites/player.png"
+      anchor={[0.5, 0.5]}
+    />
+    <Behavior
+      src="./behaviors/PlayerController.ts"
+      props={{ speed: 250, jumpForce: 500 }}
+    />
+  </GameObject>
+
+  <GameObject
+    name="RotatingEnemy"
+    tag="Enemy"
+    position={[600, 200]}
+    rotation={0}
+    scale={[1, 1]}
+    zIndex={5}
+  >
+    <Sprite
+      src="./sprites/enemy.png"
+      anchor={[0.5, 0.5]}
+      tint="#ff6666"
+    />
+    <Behavior
+      src="./behaviors/Rotator.ts"
+      props={{ speed: 180, direction: -1 }}
+    />
+  </GameObject>
+
+  <GameObject
+    name="Follower"
+    tag="Enemy"
+    position={[200, 400]}
+    rotation={0}
+    scale={[0.8, 0.8]}
+    zIndex={5}
+  >
+    <Sprite
+      src="./sprites/enemy.png"
+      anchor={[0.5, 0.5]}
+      tint="#66ff66"
+    />
+    <Behavior
+      src="./behaviors/Follower.ts"
+      props={{ targetName: "Player", speed: 80, minDistance: 100 }}
+    />
+  </GameObject>
+
+  <GameObject
+    name="Ground"
+    tag="Ground"
+    position={[400, 550]}
+    rotation={0}
+    scale={[1, 1]}
+    zIndex={0}
+  >
+    <Sprite
+      src="./sprites/ground.png"
+      anchor={[0.5, 0.5]}
+    />
+  </GameObject>
+
+</Scene>
