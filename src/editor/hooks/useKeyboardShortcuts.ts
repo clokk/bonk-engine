@@ -43,6 +43,7 @@ export function useKeyboardShortcuts(): void {
     (state) => state.selectedGameObjectIds
   );
   const currentScene = useEditorStore((state) => state.currentScene);
+  const saveScene = useEditorStore((state) => state.saveScene);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -60,12 +61,13 @@ export function useKeyboardShortcuts(): void {
         return;
       }
 
-      // Cmd+S - Save scene (placeholder for now)
+      // Cmd+S - Save scene
       if (isMeta && e.key === 's') {
         e.preventDefault();
         if (currentScene) {
-          console.log('Save scene (not yet implemented)');
-          // TODO: Implement scene saving
+          saveScene().catch((err) => {
+            console.error('Failed to save scene:', err);
+          });
         }
         return;
       }
@@ -103,5 +105,6 @@ export function useKeyboardShortcuts(): void {
     clearSelection,
     selectedGameObjectIds,
     currentScene,
+    saveScene,
   ]);
 }

@@ -1,6 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Camera, ChevronDown, ChevronRight } from 'lucide-react';
 import { Input } from '@editor/components/ui';
+import {
+  EditableNumberInput,
+  EditableCheckbox,
+  EditableVector2Input,
+} from './EditableInputs';
+import { usePropertyChange } from '@editor/hooks/usePropertyChange';
 import type { Camera2DComponent } from '@engine/components/Camera2DComponent';
 
 interface CameraInspectorProps {
@@ -9,6 +15,43 @@ interface CameraInspectorProps {
 
 export const CameraInspector: React.FC<CameraInspectorProps> = ({ camera }) => {
   const [isExpanded, setIsExpanded] = useState(true);
+  const markDirty = usePropertyChange();
+
+  const handleIsMainChange = useCallback(
+    (checked: boolean) => {
+      if (!camera) return;
+      camera.isMain = checked;
+      markDirty();
+    },
+    [camera, markDirty]
+  );
+
+  const handleZoomChange = useCallback(
+    (value: number) => {
+      if (!camera) return;
+      camera.zoom = value;
+      markDirty();
+    },
+    [camera, markDirty]
+  );
+
+  const handleSmoothingChange = useCallback(
+    (value: number) => {
+      if (!camera) return;
+      camera.followSmoothing = value;
+      markDirty();
+    },
+    [camera, markDirty]
+  );
+
+  const handleOffsetChange = useCallback(
+    (values: [number, number]) => {
+      if (!camera) return;
+      camera.offset = values;
+      markDirty();
+    },
+    [camera, markDirty]
+  );
 
   if (!camera) return null;
 
@@ -36,11 +79,9 @@ export const CameraInspector: React.FC<CameraInspectorProps> = ({ camera }) => {
           {/* Is Main */}
           <div className="flex items-center gap-2">
             <label className="text-[10px] text-zinc-500 w-16">Is Main</label>
-            <input
-              type="checkbox"
+            <EditableCheckbox
               checked={camera.isMain}
-              readOnly
-              className="w-4 h-4 rounded bg-zinc-950 border-zinc-700"
+              onChange={handleIsMainChange}
             />
             <span className="text-[10px] text-zinc-500">
               {camera.isMain ? 'Active camera' : 'Inactive'}
@@ -50,16 +91,17 @@ export const CameraInspector: React.FC<CameraInspectorProps> = ({ camera }) => {
           {/* Zoom */}
           <div className="flex items-center gap-2">
             <label className="text-[10px] text-zinc-500 w-16">Zoom</label>
-            <Input
-              type="number"
+            <EditableNumberInput
               value={camera.zoom}
-              readOnly
+              onChange={handleZoomChange}
               step={0.1}
+              min={0.1}
+              max={10}
               className="flex-1 h-6 text-[11px]"
             />
           </div>
 
-          {/* Target */}
+          {/* Target (read-only - would need a GameObject picker) */}
           <div className="flex items-center gap-2">
             <label className="text-[10px] text-zinc-500 w-16">Target</label>
             <Input
@@ -72,45 +114,24 @@ export const CameraInspector: React.FC<CameraInspectorProps> = ({ camera }) => {
           {/* Follow Smoothing */}
           <div className="flex items-center gap-2">
             <label className="text-[10px] text-zinc-500 w-16">Smoothing</label>
-            <Input
-              type="number"
+            <EditableNumberInput
               value={camera.followSmoothing}
-              readOnly
+              onChange={handleSmoothingChange}
               step={0.5}
+              min={0}
               className="flex-1 h-6 text-[11px]"
             />
           </div>
 
           {/* Offset */}
-          <div className="flex items-center gap-2">
-            <label className="text-[10px] text-zinc-500 w-16">Offset</label>
-            <div className="flex-1 grid grid-cols-2 gap-1">
-              <div className="relative">
-                <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-[10px] text-zinc-500">
-                  X
-                </span>
-                <Input
-                  type="number"
-                  value={camera.offset[0]}
-                  readOnly
-                  className="h-6 text-[11px] pl-5"
-                />
-              </div>
-              <div className="relative">
-                <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-[10px] text-zinc-500">
-                  Y
-                </span>
-                <Input
-                  type="number"
-                  value={camera.offset[1]}
-                  readOnly
-                  className="h-6 text-[11px] pl-5"
-                />
-              </div>
-            </div>
-          </div>
+          <EditableVector2Input
+            label="Offset"
+            values={camera.offset as [number, number]}
+            onChange={handleOffsetChange}
+            labelWidth="w-16"
+          />
 
-          {/* Bounds */}
+          {/* Bounds (read-only for now - would need more complex UI) */}
           {camera.bounds && (
             <div className="space-y-1">
               <label className="text-[10px] text-zinc-500">Bounds</label>

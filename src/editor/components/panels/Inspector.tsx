@@ -1,6 +1,8 @@
-import React from 'react';
-import { Panel, ScrollArea } from '@editor/components/ui';
+import React, { useState, useCallback, useEffect } from 'react';
+import { Panel, ScrollArea, Input } from '@editor/components/ui';
 import { useSelectedGameObject } from '@editor/hooks/useSelectedGameObject';
+import { usePropertyChange } from '@editor/hooks/usePropertyChange';
+import { useEditorStore } from '@editor/store/editorStore';
 import {
   TransformInspector,
   SpriteInspector,
@@ -9,6 +11,7 @@ import {
   CameraInspector,
   BehaviorInspector,
 } from '@editor/components/inspector';
+import { EditableCheckbox } from '@editor/components/inspector/EditableInputs';
 import { SpriteComponent } from '@engine/components/SpriteComponent';
 import { AnimatedSpriteComponent } from '@engine/components/AnimatedSpriteComponent';
 import { Collider2DComponent } from '@engine/components/Collider2DComponent';
@@ -19,6 +22,75 @@ import { Box } from 'lucide-react';
 
 export const Inspector: React.FC = () => {
   const { gameObject, isMultiSelect, selectedCount } = useSelectedGameObject();
+  const markDirty = usePropertyChange();
+  const renameGameObject = useEditorStore((s) => s.renameGameObject);
+
+  // Local state for editable name
+  const [localName, setLocalName] = useState('');
+  const [isNameFocused, setIsNameFocused] = useState(false);
+
+  // Local state for editable tag
+  const [localTag, setLocalTag] = useState('');
+  const [isTagFocused, setIsTagFocused] = useState(false);
+
+  // Sync from gameObject when not focused
+  useEffect(() => {
+    if (gameObject && !isNameFocused) {
+      setLocalName(gameObject.name);
+    }
+  }, [gameObject, gameObject?.name, isNameFocused]);
+
+  useEffect(() => {
+    if (gameObject && !isTagFocused) {
+      setLocalTag(gameObject.tag || '');
+    }
+  }, [gameObject, gameObject?.tag, isTagFocused]);
+
+  const handleNameCommit = useCallback(() => {
+    if (gameObject && localName && localName !== gameObject.name) {
+      renameGameObject(gameObject.id, localName);
+    }
+    setIsNameFocused(false);
+  }, [gameObject, localName, renameGameObject]);
+
+  const handleTagCommit = useCallback(() => {
+    if (gameObject && localTag !== (gameObject.tag || '')) {
+      gameObject.tag = localTag || undefined;
+      markDirty();
+    }
+    setIsTagFocused(false);
+  }, [gameObject, localTag, markDirty]);
+
+  const handleEnabledChange = useCallback(
+    (checked: boolean) => {
+      if (!gameObject) return;
+      gameObject.enabled = checked;
+      markDirty();
+    },
+    [gameObject, markDirty]
+  );
+
+  const handleNameKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleNameCommit();
+      (e.target as HTMLInputElement).blur();
+    } else if (e.key === 'Escape') {
+      setLocalName(gameObject?.name || '');
+      setIsNameFocused(false);
+      (e.target as HTMLInputElement).blur();
+    }
+  };
+
+  const handleTagKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleTagCommit();
+      (e.target as HTMLInputElement).blur();
+    } else if (e.key === 'Escape') {
+      setLocalTag(gameObject?.tag || '');
+      setIsTagFocused(false);
+      (e.target as HTMLInputElement).blur();
+    }
+  };
 
   // Multi-selection
   if (isMultiSelect) {
@@ -73,20 +145,27 @@ export const Inspector: React.FC = () => {
           {/* Header */}
           <div className="pb-2 border-b border-zinc-800">
             <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                className="w-4 h-4 rounded bg-zinc-950 border-zinc-700"
+              <EditableCheckbox
                 checked={gameObject.enabled}
-                readOnly
+                onChange={handleEnabledChange}
               />
-              <span className="flex-1 text-sm font-semibold text-zinc-200">
-                {gameObject.name}
-              </span>
-              {gameObject.tag && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400">
-                  {gameObject.tag}
-                </span>
-              )}
+              <Input
+                value={localName}
+                onChange={(e) => setLocalName(e.target.value)}
+                onFocus={() => setIsNameFocused(true)}
+                onBlur={handleNameCommit}
+                onKeyDown={handleNameKeyDown}
+                className="flex-1 h-7 text-sm font-semibold text-zinc-200 bg-transparent border-transparent hover:border-zinc-700 focus:border-sky-400"
+              />
+              <Input
+                value={localTag}
+                onChange={(e) => setLocalTag(e.target.value)}
+                onFocus={() => setIsTagFocused(true)}
+                onBlur={handleTagCommit}
+                onKeyDown={handleTagKeyDown}
+                placeholder="Tag"
+                className="w-20 h-6 text-[10px] px-1.5 py-0.5 bg-zinc-800 text-zinc-400 border-transparent hover:border-zinc-700 focus:border-sky-400"
+              />
             </div>
             {componentBadges.length > 0 && (
               <div className="flex flex-wrap gap-1 pt-1.5 ml-6">

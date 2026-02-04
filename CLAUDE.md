@@ -110,6 +110,9 @@ registerComponent('MyComponent', (gameObject, data) => {
 | `src/engine/rendering/` | PixiJS rendering abstraction |
 | `src/engine/physics/` | Matter.js physics abstraction |
 | `tools/vite-plugin-bonk-scenes/` | MDX to JSON compiler |
+| `src/editor/store/editorStore.ts` | Zustand store with scene state and actions |
+| `src/editor/lib/sceneSerializer.ts` | Scene saving to JSON |
+| `src/editor/components/layout/AppHeader.tsx` | Header bar with scene selector and save |
 
 ## Working With Scenes
 
@@ -162,7 +165,7 @@ npm run tauri:dev  # Start Tauri editor with full desktop features
 The editor is a Tauri desktop application with React frontend. It provides:
 - **Project Files panel**: Real filesystem browsing via Tauri FS plugin, with search filter
 - **Hierarchy panel**: Scene GameObject tree with type icons and search filter
-- **Inspector panel**: Component editing for selected GameObjects
+- **Inspector panel**: Editable component properties for selected GameObjects
 - **Viewport**: Scene preview with play/pause controls
 - **Claude Terminal**: Integrated Claude CLI for AI collaboration
 
@@ -170,6 +173,39 @@ The editor is a Tauri desktop application with React frontend. It provides:
 - **Frontend**: React + Tailwind CSS + Zustand for state
 - **Backend**: Tauri v2 (Rust) for filesystem access and PTY management
 - **Path alias**: `@editor/*` maps to `src/editor/*`
+
+### Header Bar Layout
+- **Left**: BONK logo | Scene dropdown (with dirty indicator) | Save button
+- **Right**: Panel toggles (Hierarchy, Bottom, Inspector) | Settings
+
+### Scene Saving
+
+Scenes are saved to JSON (not MDX). This is intentional:
+- MDX → JSON is handled by Vite plugin at build time
+- JSON → MDX would lose comments, formatting, and prose
+- JSON round-trips perfectly via existing `toJSON()` methods
+
+**Save location**: `public/scenes/{sceneName}.json`
+
+The save button in the header:
+- Pulses sky-blue when there are unsaved changes
+- Shows a checkmark briefly after successful save
+- Grayed out when no changes to save
+
+### Inspector Property Editing
+
+Most component properties can be edited directly in the Inspector:
+
+| Component | Editable Properties |
+|-----------|---------------------|
+| **Transform** | position, rotation, scale, zIndex |
+| **Sprite** | anchor, alpha, flipX, flipY |
+| **Collider2D** | width/height (box), radius (circle), offset, isTrigger |
+| **RigidBody2D** | mass, friction, restitution, gravityScale, damping, fixedRotation |
+| **Camera2D** | isMain, zoom, followSmoothing, offset |
+| **GameObject** | name, tag, enabled |
+
+Properties use a local state pattern (commit on blur/Enter) to prevent jitter during editing.
 
 ### Keyboard Shortcuts
 | Shortcut | Action |
@@ -179,6 +215,12 @@ The editor is a Tauri desktop application with React frontend. It provides:
 | `Cmd+S` | Save current scene |
 | `Cmd+R` | Refresh the editor |
 | `Escape` | Clear selection |
+
+### Unsaved Changes Protection
+
+The editor warns you before losing unsaved changes:
+- Browser `beforeunload` event warns when closing the tab/window
+- Confirmation dialog when switching scenes with unsaved changes
 
 ### Context Menus
 Right-click in panels for context-sensitive actions:

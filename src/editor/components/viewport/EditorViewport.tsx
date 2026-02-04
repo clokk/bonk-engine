@@ -68,10 +68,24 @@ export const EditorViewport: React.FC = () => {
   const clearPendingSceneLoad = useEditorStore((state) => state.clearPendingSceneLoad);
   const showInputDebug = useEditorStore((state) => state.showInputDebug);
   const setShowInputDebug = useEditorStore((state) => state.setShowInputDebug);
+  const isDirty = useEditorStore((state) => state.isDirty);
+  const currentSceneName = useEditorStore((state) => state.currentSceneName);
+  const setStoreSceneName = useEditorStore((state) => state.setCurrentSceneName);
 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [currentSceneName, setCurrentSceneName] = useState<string>('Level1');
+
+  // Warn user before leaving if there are unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isDirty) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isDirty]);
 
   // Reload the current scene (used by Stop)
   const reloadScene = useCallback(async () => {
@@ -266,7 +280,7 @@ export const EditorViewport: React.FC = () => {
     };
   }, [isPlaying, isPaused, isLoading]);
 
-  // Handle scene loading requests from ProjectFiles
+  // Handle scene loading requests from AppHeader or ProjectFiles
   useEffect(() => {
     if (!pendingSceneLoad || pendingSceneLoad === currentSceneName) {
       clearPendingSceneLoad();
@@ -296,7 +310,7 @@ export const EditorViewport: React.FC = () => {
         const scene = await loadSceneByName(pendingSceneLoad, { skipStart: true });
         sceneRef.current = scene;
         setCurrentScene(scene);
-        setCurrentSceneName(pendingSceneLoad);
+        setStoreSceneName(pendingSceneLoad);
         setCurrentScenePath(`/scenes/${pendingSceneLoad}.mdx`);
 
         // Apply initial camera view
@@ -314,7 +328,7 @@ export const EditorViewport: React.FC = () => {
     };
 
     loadNewScene();
-  }, [pendingSceneLoad, currentSceneName, isPlaying, setIsPlaying, setCurrentScene, setCurrentScenePath, clearPendingSceneLoad]);
+  }, [pendingSceneLoad, currentSceneName, isPlaying, setIsPlaying, setCurrentScene, setCurrentScenePath, clearPendingSceneLoad, setStoreSceneName]);
 
   // Handle resize
   useEffect(() => {
@@ -404,6 +418,7 @@ export const EditorViewport: React.FC = () => {
 
         {/* Right: Debug Controls */}
         <div className="absolute top-2 right-2 flex gap-1 bg-zinc-900/90 p-1 rounded-md border border-zinc-800 shadow-lg backdrop-blur-sm pointer-events-auto items-center">
+          {/* Input debug toggle */}
           <button
             onClick={() => setShowInputDebug(!showInputDebug)}
             className={`p-1.5 rounded transition-colors ${

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { Scene } from '@engine/Scene';
 import { GameObject } from '@engine/GameObject';
+import { saveSceneToJson } from '@editor/lib/sceneSerializer';
 
 export type BottomPanelTab = 'project' | 'console' | 'claude';
 
@@ -11,9 +12,11 @@ interface EditorState {
 
   // Scene
   currentScene: Scene | null;
+  currentSceneName: string;
   currentScenePath: string | null;
   pendingSceneLoad: string | null; // Scene name to load
   isDirty: boolean;
+  isSaving: boolean;
   isPlaying: boolean;
   isPaused: boolean;
 
@@ -46,12 +49,14 @@ interface EditorState {
   clearSelection: () => void;
 
   setCurrentScene: (scene: Scene | null) => void;
+  setCurrentSceneName: (name: string) => void;
   setCurrentScenePath: (path: string | null) => void;
   loadScene: (sceneName: string) => void;
   clearPendingSceneLoad: () => void;
   setIsDirty: (dirty: boolean) => void;
   setIsPlaying: (playing: boolean) => void;
   setIsPaused: (paused: boolean) => void;
+  saveScene: () => Promise<void>;
 
   setShowHierarchy: (show: boolean) => void;
   setShowInspector: (show: boolean) => void;
@@ -88,9 +93,11 @@ export const useEditorStore = create<EditorState>((set) => ({
   lastSelectedId: null,
 
   currentScene: null,
+  currentSceneName: 'Level1',
   currentScenePath: null,
   pendingSceneLoad: null,
   isDirty: false,
+  isSaving: false,
   isPlaying: false,
   isPaused: false,
 
@@ -147,12 +154,28 @@ export const useEditorStore = create<EditorState>((set) => ({
     }),
 
   setCurrentScene: (scene) => set({ currentScene: scene }),
+  setCurrentSceneName: (name) => set({ currentSceneName: name }),
   setCurrentScenePath: (path) => set({ currentScenePath: path }),
   loadScene: (sceneName) => set({ pendingSceneLoad: sceneName }),
   clearPendingSceneLoad: () => set({ pendingSceneLoad: null }),
   setIsDirty: (dirty) => set({ isDirty: dirty }),
   setIsPlaying: (playing) => set({ isPlaying: playing }),
   setIsPaused: (paused) => set({ isPaused: paused }),
+
+  saveScene: async () => {
+    const state = useEditorStore.getState();
+    if (!state.currentScene || state.isSaving) return;
+
+    set({ isSaving: true });
+    try {
+      await saveSceneToJson(state.currentScene, state.currentSceneName);
+      set({ isDirty: false, isSaving: false });
+    } catch (err) {
+      console.error('[saveScene] Failed to save:', err);
+      set({ isSaving: false });
+      throw err;
+    }
+  },
 
   setShowHierarchy: (show) => set({ showHierarchy: show }),
   setShowInspector: (show) => set({ showInspector: show }),

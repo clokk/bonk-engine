@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Activity, ChevronDown, ChevronRight } from 'lucide-react';
-import { Input } from '@editor/components/ui';
+import { EditableNumberInput, EditableCheckbox } from './EditableInputs';
+import { usePropertyChange } from '@editor/hooks/usePropertyChange';
 import type { RigidBody2DComponent } from '@engine/components/RigidBody2DComponent';
 
 interface RigidBodyInspectorProps {
@@ -11,6 +12,70 @@ export const RigidBodyInspector: React.FC<RigidBodyInspectorProps> = ({
   rigidBody,
 }) => {
   const [isExpanded, setIsExpanded] = useState(true);
+  const markDirty = usePropertyChange();
+
+  const handleMassChange = useCallback(
+    (value: number) => {
+      if (!rigidBody) return;
+      rigidBody.mass = value;
+      markDirty();
+    },
+    [rigidBody, markDirty]
+  );
+
+  const handleFrictionChange = useCallback(
+    (value: number) => {
+      if (!rigidBody) return;
+      rigidBody.friction = value;
+      markDirty();
+    },
+    [rigidBody, markDirty]
+  );
+
+  const handleRestitutionChange = useCallback(
+    (value: number) => {
+      if (!rigidBody) return;
+      rigidBody.restitution = value;
+      markDirty();
+    },
+    [rigidBody, markDirty]
+  );
+
+  const handleGravityScaleChange = useCallback(
+    (value: number) => {
+      if (!rigidBody) return;
+      rigidBody.gravityScale = value;
+      markDirty();
+    },
+    [rigidBody, markDirty]
+  );
+
+  const handleLinearDampingChange = useCallback(
+    (value: number) => {
+      if (!rigidBody) return;
+      rigidBody.linearDamping = value;
+      markDirty();
+    },
+    [rigidBody, markDirty]
+  );
+
+  const handleAngularDampingChange = useCallback(
+    (value: number) => {
+      if (!rigidBody) return;
+      rigidBody.angularDamping = value;
+      markDirty();
+    },
+    [rigidBody, markDirty]
+  );
+
+  const handleFixedRotationChange = useCallback(
+    (checked: boolean) => {
+      if (!rigidBody) return;
+      rigidBody.fixedRotation = checked;
+      markDirty();
+    },
+    [rigidBody, markDirty]
+  );
 
   if (!rigidBody) return null;
 
@@ -35,7 +100,7 @@ export const RigidBodyInspector: React.FC<RigidBodyInspectorProps> = ({
       {/* Content */}
       {isExpanded && (
         <div className="px-2 pb-2 space-y-2">
-          {/* Body Type */}
+          {/* Body Type (read-only - changing this at runtime would require recreating the body) */}
           <div className="flex items-center gap-2">
             <label className="text-[10px] text-zinc-500 w-16">Body Type</label>
             <div className="flex items-center gap-1 px-2 py-1 rounded text-xs bg-zinc-900 text-zinc-300 capitalize">
@@ -47,10 +112,10 @@ export const RigidBodyInspector: React.FC<RigidBodyInspectorProps> = ({
           {rigidBody.mass !== undefined && (
             <div className="flex items-center gap-2">
               <label className="text-[10px] text-zinc-500 w-16">Mass</label>
-              <Input
-                type="number"
+              <EditableNumberInput
                 value={rigidBody.mass}
-                readOnly
+                onChange={handleMassChange}
+                min={0.01}
                 className="flex-1 h-6 text-[11px]"
               />
             </div>
@@ -60,11 +125,12 @@ export const RigidBodyInspector: React.FC<RigidBodyInspectorProps> = ({
           {rigidBody.friction !== undefined && (
             <div className="flex items-center gap-2">
               <label className="text-[10px] text-zinc-500 w-16">Friction</label>
-              <Input
-                type="number"
+              <EditableNumberInput
                 value={rigidBody.friction}
-                readOnly
+                onChange={handleFrictionChange}
                 step={0.01}
+                min={0}
+                max={1}
                 className="flex-1 h-6 text-[11px]"
               />
             </div>
@@ -74,11 +140,12 @@ export const RigidBodyInspector: React.FC<RigidBodyInspectorProps> = ({
           {rigidBody.restitution !== undefined && (
             <div className="flex items-center gap-2">
               <label className="text-[10px] text-zinc-500 w-16">Bounce</label>
-              <Input
-                type="number"
+              <EditableNumberInput
                 value={rigidBody.restitution}
-                readOnly
+                onChange={handleRestitutionChange}
                 step={0.1}
+                min={0}
+                max={1}
                 className="flex-1 h-6 text-[11px]"
               />
             </div>
@@ -88,10 +155,9 @@ export const RigidBodyInspector: React.FC<RigidBodyInspectorProps> = ({
           {rigidBody.gravityScale !== undefined && (
             <div className="flex items-center gap-2">
               <label className="text-[10px] text-zinc-500 w-16">Gravity</label>
-              <Input
-                type="number"
+              <EditableNumberInput
                 value={rigidBody.gravityScale}
-                readOnly
+                onChange={handleGravityScaleChange}
                 step={0.1}
                 className="flex-1 h-6 text-[11px]"
               />
@@ -102,11 +168,11 @@ export const RigidBodyInspector: React.FC<RigidBodyInspectorProps> = ({
           {rigidBody.linearDamping !== undefined && (
             <div className="flex items-center gap-2">
               <label className="text-[10px] text-zinc-500 w-16">Lin. Damp</label>
-              <Input
-                type="number"
+              <EditableNumberInput
                 value={rigidBody.linearDamping}
-                readOnly
+                onChange={handleLinearDampingChange}
                 step={0.01}
+                min={0}
                 className="flex-1 h-6 text-[11px]"
               />
             </div>
@@ -116,11 +182,11 @@ export const RigidBodyInspector: React.FC<RigidBodyInspectorProps> = ({
           {rigidBody.angularDamping !== undefined && (
             <div className="flex items-center gap-2">
               <label className="text-[10px] text-zinc-500 w-16">Ang. Damp</label>
-              <Input
-                type="number"
+              <EditableNumberInput
                 value={rigidBody.angularDamping}
-                readOnly
+                onChange={handleAngularDampingChange}
                 step={0.01}
+                min={0}
                 className="flex-1 h-6 text-[11px]"
               />
             </div>
@@ -130,11 +196,9 @@ export const RigidBodyInspector: React.FC<RigidBodyInspectorProps> = ({
           {rigidBody.fixedRotation !== undefined && (
             <div className="flex items-center gap-2">
               <label className="text-[10px] text-zinc-500 w-16">Fixed Rot</label>
-              <input
-                type="checkbox"
+              <EditableCheckbox
                 checked={rigidBody.fixedRotation}
-                readOnly
-                className="w-4 h-4 rounded bg-zinc-950 border-zinc-700"
+                onChange={handleFixedRotationChange}
               />
               <span className="text-[10px] text-zinc-500">
                 {rigidBody.fixedRotation ? 'No rotation' : 'Can rotate'}

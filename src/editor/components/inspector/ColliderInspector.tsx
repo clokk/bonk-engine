@@ -1,6 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Square, Circle, ChevronDown, ChevronRight } from 'lucide-react';
-import { Input } from '@editor/components/ui';
+import {
+  EditableNumberInput,
+  EditableCheckbox,
+  EditableVector2Input,
+} from './EditableInputs';
+import { usePropertyChange } from '@editor/hooks/usePropertyChange';
 import type { Collider2DComponent } from '@engine/components/Collider2DComponent';
 
 interface ColliderInspectorProps {
@@ -11,6 +16,52 @@ export const ColliderInspector: React.FC<ColliderInspectorProps> = ({
   collider,
 }) => {
   const [isExpanded, setIsExpanded] = useState(true);
+  const markDirty = usePropertyChange();
+
+  const handleWidthChange = useCallback(
+    (value: number) => {
+      if (!collider || collider.shape.type !== 'box') return;
+      collider.shape.width = value;
+      markDirty();
+    },
+    [collider, markDirty]
+  );
+
+  const handleHeightChange = useCallback(
+    (value: number) => {
+      if (!collider || collider.shape.type !== 'box') return;
+      collider.shape.height = value;
+      markDirty();
+    },
+    [collider, markDirty]
+  );
+
+  const handleRadiusChange = useCallback(
+    (value: number) => {
+      if (!collider || collider.shape.type !== 'circle') return;
+      collider.shape.radius = value;
+      markDirty();
+    },
+    [collider, markDirty]
+  );
+
+  const handleOffsetChange = useCallback(
+    (values: [number, number]) => {
+      if (!collider) return;
+      collider.offset = values;
+      markDirty();
+    },
+    [collider, markDirty]
+  );
+
+  const handleIsTriggerChange = useCallback(
+    (checked: boolean) => {
+      if (!collider) return;
+      collider.isTrigger = checked;
+      markDirty();
+    },
+    [collider, markDirty]
+  );
 
   if (!collider) return null;
 
@@ -38,7 +89,7 @@ export const ColliderInspector: React.FC<ColliderInspectorProps> = ({
       {/* Content */}
       {isExpanded && (
         <div className="px-2 pb-2 space-y-2">
-          {/* Shape display */}
+          {/* Shape display (read-only - changing shape type would be complex) */}
           <div className="flex items-center gap-2">
             <label className="text-[10px] text-zinc-500 w-12">Shape</label>
             <div className="flex items-center gap-1 px-2 py-1 rounded text-xs bg-zinc-900 text-zinc-300">
@@ -57,10 +108,10 @@ export const ColliderInspector: React.FC<ColliderInspectorProps> = ({
                   <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-[10px] text-zinc-500">
                     W
                   </span>
-                  <Input
-                    type="number"
+                  <EditableNumberInput
                     value={shape.width}
-                    readOnly
+                    onChange={handleWidthChange}
+                    min={1}
                     className="h-6 text-[11px] pl-5"
                   />
                 </div>
@@ -68,10 +119,10 @@ export const ColliderInspector: React.FC<ColliderInspectorProps> = ({
                   <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-[10px] text-zinc-500">
                     H
                   </span>
-                  <Input
-                    type="number"
+                  <EditableNumberInput
                     value={shape.height}
-                    readOnly
+                    onChange={handleHeightChange}
+                    min={1}
                     className="h-6 text-[11px] pl-5"
                   />
                 </div>
@@ -83,52 +134,28 @@ export const ColliderInspector: React.FC<ColliderInspectorProps> = ({
           {shapeType === 'circle' && (
             <div className="flex items-center gap-2">
               <label className="text-[10px] text-zinc-500 w-12">Radius</label>
-              <Input
-                type="number"
+              <EditableNumberInput
                 value={shape.radius}
-                readOnly
+                onChange={handleRadiusChange}
+                min={1}
                 className="flex-1 h-6 text-[11px]"
               />
             </div>
           )}
 
           {/* Offset */}
-          <div className="flex items-center gap-2">
-            <label className="text-[10px] text-zinc-500 w-12">Offset</label>
-            <div className="flex-1 grid grid-cols-2 gap-1">
-              <div className="relative">
-                <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-[10px] text-zinc-500">
-                  X
-                </span>
-                <Input
-                  type="number"
-                  value={collider.offset[0]}
-                  readOnly
-                  className="h-6 text-[11px] pl-5"
-                />
-              </div>
-              <div className="relative">
-                <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-[10px] text-zinc-500">
-                  Y
-                </span>
-                <Input
-                  type="number"
-                  value={collider.offset[1]}
-                  readOnly
-                  className="h-6 text-[11px] pl-5"
-                />
-              </div>
-            </div>
-          </div>
+          <EditableVector2Input
+            label="Offset"
+            values={collider.offset as [number, number]}
+            onChange={handleOffsetChange}
+          />
 
           {/* Is Trigger */}
           <div className="flex items-center gap-2">
             <label className="text-[10px] text-zinc-500 w-12">Trigger</label>
-            <input
-              type="checkbox"
+            <EditableCheckbox
               checked={collider.isTrigger}
-              readOnly
-              className="w-4 h-4 rounded bg-zinc-950 border-zinc-700"
+              onChange={handleIsTriggerChange}
             />
             <span className="text-[10px] text-zinc-500">
               {collider.isTrigger ? 'No physics response' : 'Physical collision'}
