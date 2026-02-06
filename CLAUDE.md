@@ -181,19 +181,135 @@ cd ~/my-game && npm link bonkjs && npm run dev
 
 Editing engine source auto-rebuilds → game's Vite picks up changes.
 
-**Consumer's `vite.config.ts` additions:**
+**Consumer's `vite.config.ts`** — must include resolve aliases for bonkjs's externalized deps:
 
 ```typescript
-server: {
-  fs: {
-    allow: ['..'],  // Vite blocks serving files outside project root
+import { defineConfig } from 'vite';
+import path from 'path';
+
+const bonkEngine = path.resolve(__dirname, '../bonk-engine');
+
+export default defineConfig({
+  server: {
+    port: 3001,
+    fs: {
+      allow: ['..'],  // npm link serves files outside project root
+    },
   },
-},
-resolve: {
-  dedupe: ['pixi.js'],  // Prevents duplicate PixiJS copies via npm link
-},
+  resolve: {
+    dedupe: ['pixi.js', 'matter-js', 'howler'],
+    alias: {
+      'pixi.js': path.resolve(bonkEngine, 'node_modules/pixi.js'),
+      'matter-js': path.resolve(bonkEngine, 'node_modules/matter-js'),
+      'howler': path.resolve(bonkEngine, 'node_modules/howler'),
+    },
+  },
+  build: {
+    target: 'ES2022',
+    sourcemap: true,
+  },
+});
 ```
+
+**Why the aliases?** bonkjs externalizes pixi.js, matter-js, and howler in its library build. Via `npm link`, Vite/Rollup can't resolve these through the symlink — the alias tells it exactly where to find them. This won't be needed once bonkjs is published to npm.
 
 **Gotchas:**
 - Run `npm run dev -- --force` if Vite's dependency pre-bundling cache is stale after linking
+- If `npm install` breaks the link, re-run `npm link bonkjs` in the game project
 - When done developing, `npm unlink bonkjs` and `npm install bonkjs` to switch back to the published version
+
+## New Game Setup Recipe
+
+Scaffold a new game that consumes bonkjs:
+
+```bash
+mkdir ~/my-game && cd ~/my-game
+npm init -y
+```
+
+**`package.json`** — set `"type": "module"`, add scripts and devDeps:
+```json
+{
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "vite": "^6.1.0"
+  }
+}
+```
+
+**`tsconfig.json`** — match bonkjs target:
+```json
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}
+```
+
+**`index.html`**:
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Game</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; background: #000; overflow: hidden; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
+```
+
+**`src/main.ts`** — minimal bootstrap:
+```typescript
+import { Game } from 'bonkjs';
+
+const game = new Game();
+const canvas = await game.init({
+  width: 1280,
+  height: 720,
+  backgroundColor: 0x000000,
+});
+
+document.getElementById('app')!.appendChild(canvas);
+
+game.onUpdate(() => {
+  // Game loop running
+});
+
+game.start();
+```
+
+**`vite.config.ts`** — see the npm link section above for the full config.
+
+Then install and link:
+```bash
+npm install
+npm link bonkjs
+npm run dev
+```

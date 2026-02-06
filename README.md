@@ -1,179 +1,94 @@
-# Bonk Engine
+# bonkjs
 
-A 2D game engine with JSON scene format, designed for AI collaboration.
+A 2D game toolkit for AI collaboration. TypeScript-first. No scene format, no component hierarchy — Claude decides the architecture per game.
+
+## Install
+
+```bash
+npm install bonkjs
+```
 
 ## Quick Start
 
-```bash
-npm install
-npm run dev
-```
-
-## Architecture
-
-```
-BUILD TIME                                    RUNTIME
-─────────────────────────────────────────    ─────────────────────────────
-
-public/scenes/*.json  ──────────────────► SceneLoader
-public/prefabs/*.json ──────────────────►     │
-                                              │
-behaviors/*.ts     ───────► esbuild ─────────►│
-                                                                    │
-                                                                    ▼
-                                              Vanilla TS Game Loop (No React)
-                                                     │
-                                          ┌──────────┴──────────┐
-                                          ▼                     ▼
-                                    PixiJS Renderer       Matter.js Physics
-```
-
-## Project Structure
-
-```
-bonk-engine/
-├── src/
-│   ├── engine/              # Core engine (future: @bonk/engine npm package)
-│   │   ├── components/      # Built-in components (Sprite, etc.)
-│   │   ├── physics/         # Physics abstraction (Matter.js)
-│   │   ├── rendering/       # Rendering abstraction (PixiJS)
-│   │   └── types/           # TypeScript type definitions
-│   └── main.ts              # Demo game entry point
-├── behaviors/               # Game behaviors (scripts)
-├── docs/                    # Architecture & vision docs
-└── public/                  # Compiled output
-```
-
-### Engine vs Demo Game
-
-The `src/engine/` directory contains the core engine that could become an npm package (`@bonk/engine`). Everything outside of it (behaviors, scenes, main.ts) is a demo game that uses the engine.
-
-## Rendering
-
-Bonk Engine uses PixiJS v8 for rendering, wrapped in an abstraction layer:
-
-- **Renderer interface** - Allows swapping backends (PixiJS, Canvas2D, etc.)
-- **RenderObject** - Wrapper for visual elements with position, rotation, scale, z-index
-- **SpriteComponent** - Syncs GameObject transforms to render objects
-
-The rendering happens at the end of the game loop, after all updates are processed.
-
-## Scene Format (JSON)
-
-Scenes live in `public/scenes/` as JSON:
-
-```json
-{
-  "name": "Level1",
-  "version": 1,
-  "settings": { "gravity": [0, 980], "backgroundColor": "#1a1a2e" },
-  "gameObjects": [
-    {
-      "name": "Player",
-      "tag": "Player",
-      "transform": { "position": [100, 200], "rotation": 0, "scale": [1, 1] },
-      "components": [{ "type": "Sprite", "src": "./sprites/player.png" }],
-      "behaviors": [{ "src": "./behaviors/PlayerController.ts", "props": { "speed": 200 } }]
-    }
-  ]
-}
-```
-
-## Creating Behaviors
-
 ```typescript
-import { Behavior } from '../src/engine/Behavior';
+import { Game, Sprite, Camera, RigidBody, Input, Transform } from 'bonkjs';
 
-export default class MyBehavior extends Behavior {
-  speed: number = 100;
+const game = new Game();
+const canvas = await game.init({ width: 800, height: 600 });
+document.getElementById('app')!.appendChild(canvas);
 
-  update(): void {
-    this.transform.translate(this.speed * this.deltaTime, 0);
-  }
-}
+const player = new Transform({ position: [400, 300] });
+const sprite = new Sprite(game.renderer, { width: 48, height: 64, color: 0x00ff00, transform: player });
+const body = game.createBody(player, { type: 'dynamic', fixedRotation: true });
+body.addCollider({ type: 'box', width: 48, height: 64 });
+
+const camera = new Camera(game.renderer, { followSmoothing: 8 });
+camera.follow(() => player.worldPosition);
+
+game.onFixedUpdate(() => { body.syncFromPhysics(); });
+game.onUpdate(() => {
+  const h = Input.getAxisRaw('horizontal');
+  body.velocity = [h * 300, body.velocity[1]];
+  sprite.sync();
+});
+game.onLateUpdate(() => { camera.update(); });
+
+game.start();
 ```
 
-## Core Classes
+No scene format. No component hierarchy. Import what you need — tree-shaking handles the rest.
 
-- **GameObject** - Entities with transform, components, and behaviors
-- **Component** - Data/functionality attached to GameObjects
-- **Behavior** - Scripts with lifecycle hooks (awake, start, update, fixedUpdate)
-- **Scene** - Container for GameObjects
-- **Transform** - 2D position, rotation, scale
+## What It Provides
 
-## Lifecycle Hooks
+- **Rendering** — Sprites, animated sprites, camera follow/zoom/bounds, z-ordering, screen shake (PixiJS v8)
+- **Physics** — Rigid body, collider shapes, collision layers, triggers, raycasting (Matter.js)
+- **Input** — Named axes and buttons, raw key/mouse access, smoothed variants
+- **Audio** — Music, SFX, spatial audio, browser autoplay handling (Howler.js)
+- **Math** — vec2 operations (add, sub, normalize, dot, cross, lerp, rotate, distance)
+- **Game Loop** — Fixed timestep physics (60Hz), variable render, time scaling, coroutines
 
-```typescript
-class MyBehavior extends Behavior {
-  awake(): void {}        // Called once on creation
-  start(): void {}        // Called after all awakes
-  update(): void {}       // Called every frame
-  fixedUpdate(): void {}  // Called at fixed timestep (60fps)
-  lateUpdate(): void {}   // Called after update
-  onDestroy(): void {}    // Called on destruction
-}
+## What It Does NOT Provide
+
+- Scene format or scene loader
+- GameObject/Component/Behavior hierarchy
+- Editor panels or inspector
+- Entity-component framework
+
+Games build their own architecture. The game code IS the scene.
+
+## Architecture — The Sandwich Model
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  Layer 3: Bonk Overlay (game-agnostic dev tools)        │
+│  Debug wireframes, performance overlays, build targets  │
+├─────────────────────────────────────────────────────────┤
+│  Layer 2: Game Code (your code, game-specific)          │
+│  Whatever architecture THIS game needs                  │
+├─────────────────────────────────────────────────────────┤
+│  Layer 1: Bonk Runtime (game-agnostic tools)            │
+│  Rendering, physics, input, audio, math, camera, UI     │
+└─────────────────────────────────────────────────────────┘
 ```
 
-## Coroutines
-
-```typescript
-*fadeOut() {
-  for (let alpha = 1; alpha >= 0; alpha -= 0.1) {
-    this.sprite.alpha = alpha;
-    yield* this.wait(0.1);  // Respects Time.timeScale
-  }
-}
-
-start(): void {
-  this.startCoroutine(this.fadeOut());
-}
-```
-
-## Hot Reload
-
-- Behavior changes: Preserved props, reinitialize instances
-- Scene changes: Diff and patch GameObjects
-- Works automatically in dev mode
+Layer 1 is the npm package. Layer 2 is whatever your game needs. Layer 3 is optional dev tooling (planned).
 
 ## Commands
 
 ```bash
-npm run dev        # Start dev server with hot reload
-npm run build      # Production build
-npm run typecheck  # Type checking
+npm run dev          # Hot-reload dev server (port 3000)
+npm run build        # Library build (ESM + declarations → dist/)
+npm run build:watch  # Library build with file watching
+npm run typecheck    # Type check only
 ```
 
 ## Documentation
 
-- [docs/README.md](./docs/README.md) - **Start here** -- full docs index
-- [CLAUDE.md](./CLAUDE.md) - AI collaboration context and conventions
-- [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) - Architecture and core classes
-- [docs/SCENES-AND-PREFABS.md](./docs/SCENES-AND-PREFABS.md) - Scene format, loading, prefabs
-- [docs/INPUT.md](./docs/INPUT.md) - Input system (axes, buttons, mouse)
-- [docs/TIME.md](./docs/TIME.md) - Time, delta time, timeScale
-- [docs/EVENTS.md](./docs/EVENTS.md) - Event system and messaging
-- [docs/VISION.md](./docs/VISION.md) - Product vision and design principles
-
-## Future Architecture
-
-The engine is designed for eventual extraction:
-
-```
-@bonk/engine (npm package)    ←── src/engine/ becomes this
-├── GameObject, Transform, Component, Behavior
-├── Scene, SceneLoader
-├── rendering/, physics/
-└── Time, Input, Events
-
-bonk-cli                      ←── Scaffolding tool
-└── create-bonk-game
-
-Your Game Project             ←── What users build
-├── behaviors/
-├── scenes/
-└── assets/
-```
-
-## Contributing
-
-See [CLAUDE.md](./CLAUDE.md) for conventions and patterns used in this codebase.
+- [CLAUDE.md](./CLAUDE.md) — AI collaboration context, new game setup recipe, npm link workflow
+- [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) — Full architecture
+- [docs/CAMERA.md](./docs/CAMERA.md) — Camera system
+- [docs/PHYSICS.md](./docs/PHYSICS.md) — Physics and collision
+- [docs/INPUT.md](./docs/INPUT.md) — Input system
+- [docs/AUDIO-SYSTEM.md](./docs/AUDIO-SYSTEM.md) — Audio
+- [docs/EVENTS.md](./docs/EVENTS.md) — Event system
+- [docs/UI-SYSTEM.md](./docs/UI-SYSTEM.md) — UI system
