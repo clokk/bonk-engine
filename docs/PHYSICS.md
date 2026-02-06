@@ -2,13 +2,40 @@
 
 Bonk Engine uses Matter.js for 2D physics simulation.
 
-## Components
+## Creating Physics Bodies
 
-### RigidBody2D
+Physics bodies are created through the Game instance and managed directly in TypeScript:
 
-Adds physics simulation to a GameObject.
+```typescript
+import { Game, RigidBody, Transform, CollisionLayers } from 'bonk-engine';
 
-**Properties:**
+const game = new Game({ width: 800, height: 600 });
+
+// Create a transform for positioning
+const transform = new Transform([100, 100], 0, [1, 1]);
+
+// Create a physics body
+const body = game.createBody(transform, {
+  bodyType: 'dynamic',
+  mass: 1,
+  friction: 0.1,
+  restitution: 0,
+  gravityScale: 1,
+  fixedRotation: false,
+  linearDamping: 0.01
+});
+
+// Add a collider to define the shape
+body.addCollider({
+  type: 'box',
+  width: 32,
+  height: 32
+});
+```
+
+## Configuration Options
+
+**Body Configuration:**
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
 | `bodyType` | `'dynamic' \| 'static' \| 'kinematic'` | `'dynamic'` | How the body behaves |
@@ -24,216 +51,332 @@ Adds physics simulation to a GameObject.
 - `static` - Never moves, used for ground/walls
 - `kinematic` - Moved by code, not affected by forces
 
-**Runtime API:**
+## Collider Shapes
+
+Bodies need at least one collider to participate in physics:
+
 ```typescript
-// In a Behavior
-const rb = this.rigidbody;
+// Box collider
+body.addCollider({
+  type: 'box',
+  width: 32,
+  height: 32,
+  offset: [0, 0]  // optional offset from body position
+});
 
-// Get/set velocity
-rb.velocity = [100, 0];
-const [vx, vy] = rb.velocity;
+// Circle collider
+body.addCollider({
+  type: 'circle',
+  radius: 16,
+  offset: [0, 0]
+});
 
-// Apply forces (continuous, like wind)
-rb.applyForce([10, 0]);
-
-// Apply impulse (instant, like explosion)
-rb.applyImpulse([0, -500]);
+// Polygon collider (convex only)
+body.addCollider({
+  type: 'polygon',
+  vertices: [[0, 0], [32, 0], [16, 32]],
+  offset: [0, 0]
+});
 ```
 
-### Collider2D
-
-Defines the collision shape. Requires RigidBody2D on same GameObject.
-
-**Properties:**
+**Collider Properties:**
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `shape` | `ColliderShape` | required | Collision shape |
+| `type` | `'box' \| 'circle' \| 'polygon'` | required | Collision shape type |
+| `offset` | `[x, y]` | `[0, 0]` | Offset from body position |
 | `isTrigger` | `boolean` | `false` | Detect overlap without collision |
-| `offset` | `[x, y]` | `[0, 0]` | Offset from transform |
 | `layer` | `string` | `'default'` | Collision layer this collider belongs to |
 | `mask` | `string[]` | `[]` (all) | Layers this collider interacts with |
 
-**Shapes:**
+## Runtime API
+
+### Velocity
+
 ```typescript
-// Box
-shape={{ type: 'box', width: 32, height: 32 }}
+// Get current velocity
+const [vx, vy] = body.velocity;
 
-// Circle
-shape={{ type: 'circle', radius: 16 }}
+// Set velocity directly
+body.velocity = [100, 0];
 
-// Polygon (convex only)
-shape={{ type: 'polygon', vertices: [[0,0], [32,0], [16,32]] }}
+// Modify y-velocity while preserving x
+const [vx, _] = body.velocity;
+body.velocity = [vx, -500];
+```
+
+### Forces and Impulses
+
+```typescript
+// Apply continuous force (like wind, called every frame)
+body.applyForce([10, 0]);
+
+// Apply instant impulse (like explosion, called once)
+body.applyImpulse([0, -500]);
+```
+
+### Synchronization
+
+```typescript
+// For dynamic bodies: update transform from physics simulation
+body.syncFromPhysics();
+
+// For kinematic bodies: push transform changes to physics
+body.syncToPhysics();
 ```
 
 ## Collision Callbacks
 
-Behaviors can respond to physical collisions (non-sensor bodies):
+Bodies can respond to collisions with other bodies:
 
 ```typescript
-class MyBehavior extends Behavior {
-  onCollisionEnter(other: GameObject, contact: ContactInfo): void {
-    console.log('Hit:', other.name);
-    console.log('Contact point:', contact.point);
-    console.log('Contact normal:', contact.normal);
-  }
+const player = game.createBody(playerTransform, { bodyType: 'dynamic' });
+player.addCollider({ type: 'box', width: 32, height: 64 });
 
-  onCollisionExit(other: GameObject): void {
-    console.log('Stopped touching:', other.name);
-  }
-}
+player.onCollisionEnter((other, contact) => {
+  console.log('Hit body:', other);
+  console.log('Contact point:', contact.point);
+  console.log('Contact normal:', contact.normal);
+});
+
+player.onCollisionExit((other) => {
+  console.log('Stopped touching:', other);
+});
 ```
+
+**ContactInfo properties:**
+- `point: [x, y]` - World-space contact point
+- `normal: [x, y]` - Surface normal at contact point
 
 ## Triggers
 
-A collider with `isTrigger: true` is a **sensor** — it detects overlaps without physical collision response. Sensor collisions route to `onTriggerEnter`/`onTriggerExit` instead of `onCollisionEnter`/`onCollisionExit`.
+A collider with `isTrigger: true` is a **sensor** — it detects overlaps without physical collision response. Sensor collisions route to trigger callbacks instead of collision callbacks.
 
 ```typescript
-class PickupZone extends Behavior {
-  onTriggerEnter(other: GameObject): void {
-    if (other.tag === 'Player') {
-      console.log('Player entered pickup zone');
-      this.destroy();
-    }
-  }
+const pickupZone = game.createBody(transform, { bodyType: 'kinematic', gravityScale: 0 });
 
-  onTriggerExit(other: GameObject): void {
-    console.log('Left the zone');
-  }
-}
+// Add trigger collider
+pickupZone.addCollider({
+  type: 'box',
+  width: 80,
+  height: 80,
+  isTrigger: true
+});
+
+// Register trigger callbacks
+pickupZone.onTriggerEnter((other) => {
+  console.log('Body entered trigger zone:', other);
+  // Handle pickup logic
+});
+
+pickupZone.onTriggerExit((other) => {
+  console.log('Body left trigger zone:', other);
+});
 ```
 
-Key differences from collision callbacks:
+**Key differences from collision callbacks:**
 - Trigger callbacks do **not** receive `ContactInfo` — sensors don't generate contact points
 - If either body in a pair is a sensor, trigger callbacks fire (not collision callbacks)
+- Triggers don't affect movement — objects pass through freely
 
-Common use cases: pickup zones, damage areas, checkpoints, level transitions.
+**Common use cases:** pickup zones, damage areas, checkpoints, level transitions, detection volumes.
 
 ## Collision Layers
 
 Collision layers control which objects can collide with each other using bitmask filtering.
 
-### Declaring Layers
+### Layer Configuration
 
-Declare layers upfront in scene settings (optional — layers auto-register on first use):
+Configure layers directly on colliders:
 
-```json
-{
-  "settings": {
-    "gravity": [0, 980],
-    "collisionLayers": ["default", "player", "enemy", "projectile", "trigger"]
-  }
-}
-```
+```typescript
+import { CollisionLayers } from 'bonk-engine';
 
-### Configuring on Collider2D
+// Player collides with everything
+const player = game.createBody(playerTransform, { bodyType: 'dynamic' });
+player.addCollider({
+  type: 'box',
+  width: 32,
+  height: 64,
+  layer: 'player'
+  // mask: [] means collide with all layers
+});
 
-Each collider has a `layer` (what it is) and `mask` (what it collides with):
+// Enemy only collides with player and projectiles
+const enemy = game.createBody(enemyTransform, { bodyType: 'dynamic' });
+enemy.addCollider({
+  type: 'circle',
+  radius: 16,
+  layer: 'enemy',
+  mask: ['player', 'projectile']
+});
 
-```json
-{
-  "type": "Collider2D",
-  "shape": { "type": "box", "width": 32, "height": 32 },
-  "layer": "projectile",
-  "mask": ["enemy"]
-}
+// Bullet only hits enemies (passes through player)
+const bullet = game.createBody(bulletTransform, { bodyType: 'dynamic' });
+bullet.addCollider({
+  type: 'circle',
+  radius: 4,
+  layer: 'projectile',
+  mask: ['enemy']
+});
 ```
 
 - **`layer`** — Which layer this collider belongs to. Default: `"default"`.
-- **`mask`** — Which layers this collider interacts with. Empty = collides with everything.
+- **`mask`** — Which layers this collider interacts with. Empty array = collides with everything.
 
 ### Example Setup
 
 | Object | Layer | Mask | Result |
 |--------|-------|------|--------|
-| Player | `"player"` | (empty) | Collides with everything |
+| Player | `"player"` | `[]` (empty) | Collides with everything |
 | Enemy | `"enemy"` | `["player", "projectile"]` | Collides with player and projectiles only |
 | Bullet | `"projectile"` | `["enemy"]` | Passes through player, hits enemies |
-| Ground | `"default"` | (empty) | Collides with everything |
+| Ground | `"default"` | `[]` (empty) | Collides with everything |
 
 ### Runtime API
 
 ```typescript
-import { CollisionLayers } from '../src/engine';
+import { CollisionLayers } from 'bonk-engine';
 
-CollisionLayers.register('player');           // Pre-register a layer
-CollisionLayers.category('projectile');       // Get bitmask (auto-registers)
-CollisionLayers.mask(['player', 'enemy']);    // Get combined bitmask
-CollisionLayers.getLayerNames();              // All registered names
-```
+// Pre-register layers (optional - auto-registers on first use)
+CollisionLayers.register('player');
+CollisionLayers.register('enemy');
+CollisionLayers.register('projectile');
 
-## Scene Usage
+// Get bitmask for a layer (auto-registers if new)
+const playerCategory = CollisionLayers.category('player');
 
-```json
-{
-  "settings": { "gravity": [0, 980] },
-  "gameObjects": [
-    {
-      "name": "Player",
-      "components": [
-        { "type": "RigidBody2D", "bodyType": "dynamic" },
-        { "type": "Collider2D", "shape": { "type": "box", "width": 32, "height": 64 } }
-      ]
-    },
-    {
-      "name": "Ground",
-      "components": [
-        { "type": "RigidBody2D", "bodyType": "static" },
-        { "type": "Collider2D", "shape": { "type": "box", "width": 800, "height": 32 } }
-      ]
-    },
-    {
-      "name": "Coin",
-      "components": [
-        { "type": "RigidBody2D", "bodyType": "kinematic", "gravityScale": 0 },
-        { "type": "Collider2D", "shape": { "type": "circle", "radius": 16 }, "isTrigger": true }
-      ]
-    }
-  ]
-}
+// Get combined bitmask for multiple layers
+const enemyMask = CollisionLayers.mask(['player', 'enemy']);
+
+// Get all registered layer names
+const allLayers = CollisionLayers.getLayerNames();
 ```
 
 ## Physics Queries
 
-Available via Scene's physicsWorld:
+Query the physics world for raycasting and area checks:
 
 ```typescript
-// Raycast
-const hit = this.gameObject.scene.physicsWorld.raycast(
-  [100, 100],    // origin
-  [1, 0],        // direction (normalized)
+// Raycast - find first body along a ray
+const hit = game.physics.raycast(
+  [100, 100],    // origin point
+  [1, 0],        // direction vector (should be normalized)
   200            // max distance
 );
+
 if (hit) {
-  console.log('Hit at:', hit.point);
-  console.log('Surface normal:', hit.normal);  // actual surface normal
-  console.log('Distance:', hit.distance);
+  console.log('Hit at:', hit.point);           // [x, y] contact point
+  console.log('Surface normal:', hit.normal);  // [x, y] surface normal
+  console.log('Distance:', hit.distance);      // distance to hit
+  console.log('Body:', hit.body);              // RigidBody that was hit
 }
 
-// Query area
-const bodies = this.gameObject.scene.physicsWorld.queryAABB(
-  [0, 0],      // min corner
-  [100, 100]   // max corner
+// Query AABB - find all bodies in a rectangular area
+const bodies = game.physics.queryAABB(
+  [0, 0],        // min corner [x, y]
+  [100, 100]     // max corner [x, y]
 );
+
+bodies.forEach(body => {
+  console.log('Found body in area:', body);
+});
+```
+
+## Complete Example
+
+```typescript
+import { Game, Transform, CollisionLayers } from 'bonk-engine';
+
+const game = new Game({
+  width: 800,
+  height: 600,
+  gravity: [0, 980]  // pixels/second²
+});
+
+// Register collision layers
+CollisionLayers.register('player');
+CollisionLayers.register('enemy');
+CollisionLayers.register('projectile');
+
+// Create player
+const playerTransform = new Transform([100, 100], 0, [1, 1]);
+const player = game.createBody(playerTransform, {
+  bodyType: 'dynamic',
+  fixedRotation: true
+});
+player.addCollider({
+  type: 'box',
+  width: 32,
+  height: 64,
+  layer: 'player'
+});
+
+// Create static ground
+const groundTransform = new Transform([400, 550], 0, [1, 1]);
+const ground = game.createBody(groundTransform, {
+  bodyType: 'static'
+});
+ground.addCollider({
+  type: 'box',
+  width: 800,
+  height: 32
+});
+
+// Create enemy with collision filtering
+const enemyTransform = new Transform([300, 100], 0, [1, 1]);
+const enemy = game.createBody(enemyTransform, {
+  bodyType: 'dynamic'
+});
+enemy.addCollider({
+  type: 'circle',
+  radius: 16,
+  layer: 'enemy',
+  mask: ['player', 'projectile']  // doesn't collide with other enemies
+});
+
+// Create trigger zone (pickup)
+const coinTransform = new Transform([200, 200], 0, [1, 1]);
+const coin = game.createBody(coinTransform, {
+  bodyType: 'kinematic',
+  gravityScale: 0
+});
+coin.addCollider({
+  type: 'circle',
+  radius: 16,
+  isTrigger: true
+});
+coin.onTriggerEnter((other) => {
+  console.log('Coin collected!');
+  // Remove coin from game
+});
+
+// Game loop with fixed timestep physics
+game.start();
 ```
 
 ## Timing
 
-Physics runs at a fixed 60Hz timestep:
-- `fixedUpdate()` is called at consistent intervals
-- Use `fixedUpdate()` for physics-related code
-- Use `update()` for rendering/input (variable framerate)
+Physics runs at a fixed 60Hz timestep (by default):
+- Physics updates happen at consistent intervals regardless of framerate
+- Use fixed timestep for physics calculations
+- Rendering can run at variable framerate
 
 ## Velocity and Movement
 
-Matter.js velocity is in **pixels per physics step**, not pixels per second. When setting velocity for continuous movement, multiply by `fixedDeltaTime`:
+Matter.js velocity is in **pixels per physics step**, not pixels per second. When setting velocity for continuous movement, scale appropriately:
 
 ```typescript
-// Continuous movement (applied every frame)
-const [, vy] = rb.velocity;
-rb.velocity = [moveX * speed * this.fixedDeltaTime, vy];
+const speed = 250;  // pixels per second
+const fixedDeltaTime = 1 / 60;  // 60Hz physics
+
+// Continuous horizontal movement (applied every frame)
+const [_, vy] = body.velocity;
+body.velocity = [speed * fixedDeltaTime, vy];
 
 // One-time velocity change (like jump) - also scale
-rb.velocity = [vx, -jumpForce * this.fixedDeltaTime];
+const jumpForce = 500;  // pixels per second
+const [vx, _] = body.velocity;
+body.velocity = [vx, -jumpForce * fixedDeltaTime];
 ```
 
 With `speed = 250` and `fixedDeltaTime = 1/60`:
@@ -242,8 +385,10 @@ With `speed = 250` and `fixedDeltaTime = 1/60`:
 
 ## Tips
 
-1. **Performance**: Use simple shapes (box, circle) over polygons
-2. **Tunneling**: For fast-moving objects, use smaller colliders or continuous collision detection
-3. **Stacking**: Use low restitution (0) for stable stacks
+1. **Performance**: Use simple shapes (box, circle) over polygons when possible
+2. **Tunneling**: For fast-moving objects, use smaller colliders or increase physics step rate
+3. **Stacking**: Use low restitution (0) for stable stacks of objects
 4. **One-way platforms**: Use collision layers to filter which objects interact
-5. **Input timing**: Ensure `Input.update()` is called at the END of the frame so `getButtonDown` works in `fixedUpdate`
+5. **Layer optimization**: Only include necessary layers in mask arrays to reduce collision checks
+6. **Trigger zones**: Use kinematic bodies with `gravityScale: 0` for stationary triggers
+7. **Cleanup**: Remove bodies from the game when no longer needed to free resources

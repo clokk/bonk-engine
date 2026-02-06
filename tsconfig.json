@@ -15,23 +15,13 @@
     "sourceMap": true,
     "outDir": "./dist",
     "rootDir": ".",
-    "baseUrl": ".",
-    "jsx": "react-jsx",
-    "paths": {
-      "@engine/*": ["src/engine/*"],
-      "@behaviors/*": ["behaviors/*"],
-      "@editor/*": ["src/editor/*"]
-    }
+    "baseUrl": "."
   },
   "include": [
-    "src/**/*.ts",
-    "src/**/*.tsx",
-    "tools/**/*.ts",
-    "behaviors/**/*.ts"
+    "src/**/*.ts"
   ],
   "exclude": [
     "node_modules",
-    "dist",
-    "src-tauri"
+    "dist"
   ]
 }

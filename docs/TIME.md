@@ -15,24 +15,25 @@ Bonk Engine's `Time` class provides frame timing and time scaling.
 | `Time.frameCount` | `number` | Total frames since start |
 | `Time.fps` | `number` | Current frames per second |
 
-## Using in Behaviors
+## Basic Usage
 
-Behaviors have shortcut properties for the most common values:
+Import and use `Time` directly:
 
 ```typescript
-class Mover extends Behavior {
-  speed: number = 200;
+import { Time, Input } from 'bonk-engine';
 
-  update(): void {
-    // Frame-rate independent movement
-    this.transform.translate(this.speed * this.deltaTime, 0);
+game.onUpdate(() => {
+  // Frame-rate independent movement
+  const speed = 200;
+  if (Input.getButton('right')) {
+    player.transform.translate(speed * Time.deltaTime, 0);
   }
+});
 
-  fixedUpdate(): void {
-    // Physics uses fixedDeltaTime
-    this.rigidbody?.applyForce([10 * this.fixedDeltaTime, 0]);
-  }
-}
+game.onFixedUpdate(() => {
+  // Physics uses fixedDeltaTime
+  player.rigidbody?.applyForce([10 * Time.fixedDeltaTime, 0]);
+});
 ```
 
 ## Time Scale
@@ -58,43 +59,62 @@ Time.timeScale = 2;
 Set `timeScale` to 0 to pause gameplay. Use `unscaledDeltaTime` for things that should still animate during pause (menu transitions, UI):
 
 ```typescript
-class PauseManager extends Behavior {
-  private wasPaused = false;
+import { Time, Input } from 'bonk-engine';
 
-  update(): void {
-    if (this.getButtonDown('pause')) {
-      if (Time.timeScale === 0) {
-        Time.timeScale = 1;
-      } else {
-        Time.timeScale = 0;
-      }
+game.onUpdate(() => {
+  if (Input.getButtonDown('pause')) {
+    if (Time.timeScale === 0) {
+      Time.timeScale = 1;
+    } else {
+      Time.timeScale = 0;
     }
   }
-}
+
+  // UI animation that continues during pause
+  menuAlpha += 2 * Time.unscaledDeltaTime;
+});
 ```
 
 ### Hit Freeze
 
-Classic hit-stop effect:
+Classic hit-stop effect using coroutines:
 
 ```typescript
-*hitFreeze() {
+import { GlobalScheduler, Time } from 'bonk-engine';
+
+function* hitFreeze() {
   Time.timeScale = 0.05;
-  yield* this.wait(0.1);  // Respects timeScale, so this is ~2 real seconds
+
+  // Wait using scaled time - this waits 0.1 game seconds
+  // which is ~2 real seconds at timeScale 0.05
+  const start = Time.time;
+  while (Time.time - start < 0.1) {
+    yield;
+  }
+
   Time.timeScale = 1;
 }
+
+// Trigger hit freeze on collision
+game.onCollisionEnter((collision) => {
+  if (collision.other.tag === 'enemy') {
+    GlobalScheduler.start(hitFreeze);
+  }
+});
 ```
 
 For a real-time duration instead:
 
 ```typescript
-*hitFreeze() {
+function* hitFreezeRealtime() {
   Time.timeScale = 0.05;
-  // Wait using unscaled time manually
+
+  // Wait using unscaled time - always 0.1 real seconds
   const start = Time.unscaledTime;
   while (Time.unscaledTime - start < 0.1) {
-    yield* this.waitFrames(1);
+    yield;
   }
+
   Time.timeScale = 1;
 }
 ```
@@ -103,8 +123,8 @@ For a real-time duration instead:
 
 The engine runs two update loops:
 
-1. **Fixed update** (60 Hz) -- `fixedUpdate()` is called at a constant rate using an accumulator pattern. Physics runs here.
-2. **Variable update** -- `update()` and `lateUpdate()` run once per rendered frame. Use `deltaTime` for frame-rate independent logic.
+1. **Fixed update** (60 Hz) -- Runs at a constant rate using an accumulator pattern. Physics runs here.
+2. **Variable update** -- `onUpdate()` and `onLateUpdate()` run once per rendered frame. Use `deltaTime` for frame-rate independent logic.
 
 ```
 Each frame:
@@ -114,4 +134,84 @@ Each frame:
   lateUpdate()   ×1
   Input.update()
   render()
+```
+
+### Callbacks
+
+Register callbacks with the game instance:
+
+```typescript
+import { Time, Input } from 'bonk-engine';
+
+// Variable timestep - runs every frame
+game.onUpdate(() => {
+  console.log(`Frame ${Time.frameCount}, dt: ${Time.deltaTime}`);
+});
+
+// Fixed timestep - runs at 60 Hz
+game.onFixedUpdate(() => {
+  // Physics and deterministic logic here
+  console.log(`Fixed update, dt: ${Time.fixedDeltaTime}`);
+});
+
+// After all updates - useful for cameras
+game.onLateUpdate(() => {
+  camera.followTarget(player.transform.position);
+});
+```
+
+## Common Patterns
+
+### Frame-rate Independent Movement
+
+```typescript
+import { Time, Input } from 'bonk-engine';
+
+const speed = 100; // units per second
+
+game.onUpdate(() => {
+  let dx = 0;
+  let dy = 0;
+
+  if (Input.getButton('left')) dx -= 1;
+  if (Input.getButton('right')) dx += 1;
+  if (Input.getButton('up')) dy -= 1;
+  if (Input.getButton('down')) dy += 1;
+
+  // Scale by deltaTime for smooth movement at any framerate
+  entity.transform.translate(
+    dx * speed * Time.deltaTime,
+    dy * speed * Time.deltaTime
+  );
+});
+```
+
+### Timers and Delays
+
+```typescript
+import { GlobalScheduler, Time } from 'bonk-engine';
+
+function* delayedAction() {
+  console.log('Starting...');
+
+  // Wait 2 seconds (scaled time)
+  const start = Time.time;
+  while (Time.time - start < 2) {
+    yield;
+  }
+
+  console.log('2 seconds later!');
+}
+
+GlobalScheduler.start(delayedAction);
+```
+
+### FPS Display
+
+```typescript
+import { Time } from 'bonk-engine';
+
+game.onUpdate(() => {
+  fpsText.text = `FPS: ${Math.round(Time.fps)}`;
+});
 ```

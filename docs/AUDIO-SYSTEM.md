@@ -7,39 +7,41 @@ Bonk Engine's audio system provides Unity-familiar patterns for audio playback u
 The audio system uses a hybrid approach:
 
 - **AudioManager** - Global singleton for caching sounds, managing volume categories, and handling browser autoplay restrictions
-- **AudioSourceComponent** - Per-GameObject component for playback control and spatial audio
+- **AudioSource** - Standalone class for playback control and spatial audio
 
 ## Quick Start
 
-### Basic Playback (JSON)
-
-```json
-{
-  "name": "BackgroundMusic",
-  "transform": { "position": [0, 0], "rotation": 0, "scale": [1, 1] },
-  "components": [{
-    "type": "AudioSource",
-    "src": "./audio/music.mp3",
-    "category": "music",
-    "loop": true,
-    "playOnAwake": true,
-    "volume": 0.5
-  }]
-}
-```
-
-### Playback from Behavior
+### Basic Playback
 
 ```typescript
-import { Behavior, AudioSourceComponent } from 'bonk-engine';
+import { AudioSource } from 'bonk-engine';
 
-class Collectible extends Behavior {
-  onTriggerEnter(other: GameObject) {
-    if (other.tag === 'Player') {
-      this.getComponent(AudioSourceComponent)?.play();
-      this.destroy();
-    }
-  }
+const music = new AudioSource({
+  src: './audio/music.mp3',
+  category: 'music',
+  loop: true,
+  volume: 0.5,
+});
+
+await music.load();
+music.play();
+```
+
+### One-Shot Sound Effects
+
+```typescript
+import { AudioSource } from 'bonk-engine';
+
+const coinSound = new AudioSource({
+  src: './audio/sfx/coin.wav',
+  category: 'sfx',
+});
+
+await coinSound.load();
+
+// Play rapid-fire sounds without cutting off
+function collectCoin() {
+  coinSound.playOneShot();
 }
 ```
 
@@ -60,16 +62,15 @@ const musicVolume = audio.getVolume('music'); // 0.5
 const effectiveMusic = audio.getEffectiveVolume('music'); // 0.4 (0.8 * 0.5)
 ```
 
-## AudioSourceComponent
+## AudioSource
 
-### Properties
+### Constructor Options
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
 | `src` | string | `''` | Audio file path |
 | `volume` | number | `1` | Base volume (0-1) |
 | `loop` | boolean | `false` | Loop playback |
-| `playOnAwake` | boolean | `false` | Auto-play when component starts |
 | `category` | `'music' \| 'sfx'` | `'sfx'` | Volume category |
 | `spatial` | boolean | `false` | Enable 2D spatial audio |
 | `minDistance` | number | `100` | Distance for full volume |
@@ -78,6 +79,9 @@ const effectiveMusic = audio.getEffectiveVolume('music'); // 0.4 (0.8 * 0.5)
 ### Methods
 
 ```typescript
+// Load the audio (async)
+await audioSource.load();
+
 // Playback control
 audioSource.play();      // Start playing
 audioSource.pause();     // Pause playback
@@ -104,7 +108,7 @@ audioSource.getDuration();  // number - total duration
 
 ### Initialization
 
-AudioManager auto-initializes when the first AudioSourceComponent loads. You can also initialize manually:
+AudioManager auto-initializes when the first AudioSource loads. You can also initialize manually:
 
 ```typescript
 import { AudioManager } from 'bonk-engine';
@@ -117,14 +121,16 @@ AudioManager.init();
 Three volume categories that multiply together:
 
 ```
-effectiveVolume = master × category × componentVolume
+effectiveVolume = master × category × audioSourceVolume
 ```
 
-Example: master=0.8, music=0.5, component=0.7 → effective=0.28
+Example: master=0.8, music=0.5, audioSource=0.7 → effective=0.28
 
 ### Preloading
 
 ```typescript
+import { getAudioManager } from 'bonk-engine';
+
 const audio = getAudioManager();
 
 // Preload sounds during loading screen
@@ -165,20 +171,30 @@ audio.destroy();
 
 2D spatial audio uses stereo panning and distance-based volume falloff.
 
-```json
-{
-  "name": "Waterfall",
-  "transform": { "position": [500, 0], "rotation": 0, "scale": [1, 1] },
-  "components": [{
-    "type": "AudioSource",
-    "src": "./audio/ambient/waterfall.mp3",
-    "spatial": true,
-    "minDistance": 100,
-    "maxDistance": 400,
-    "loop": true,
-    "playOnAwake": true
-  }]
+```typescript
+import { AudioSource, Transform } from 'bonk-engine';
+
+const waterfall = new AudioSource({
+  src: './audio/ambient/waterfall.mp3',
+  spatial: true,
+  minDistance: 100,
+  maxDistance: 400,
+  loop: true,
+});
+
+await waterfall.load();
+
+// Set position
+const transform = new Transform();
+transform.position = [500, 0];
+waterfall.setTransform(transform);
+
+// Update spatial audio in your game loop
+function gameLoop(renderer) {
+  waterfall.updateSpatialAudio(renderer);
 }
+
+waterfall.play();
 ```
 
 ### How It Works
@@ -215,11 +231,13 @@ Modern browsers block autoplay until user interaction. The audio system handles 
 
 1. `AudioManager.init()` sets up click/touch/keydown listeners
 2. On first interaction, the audio context is unlocked
-3. Sounds with `playOnAwake=true` queue and play after unlock
+3. Sounds queued before unlock will play after user interaction
 
 ### Checking Unlock Status
 
 ```typescript
+import { getAudioManager } from 'bonk-engine';
+
 const audio = getAudioManager();
 
 if (audio.isUnlocked()) {
@@ -255,24 +273,27 @@ GlobalEvents.on(AudioEvents.VOLUME_CHANGED, ({ category, value }) => {
 ### Music Player with Crossfade
 
 ```typescript
-class MusicPlayer extends Behavior {
-  private currentMusic: AudioSourceComponent | null = null;
+import { AudioSource } from 'bonk-engine';
+
+class MusicPlayer {
+  private currentMusic: AudioSource | null = null;
 
   async playTrack(src: string) {
     // Fade out current
     if (this.currentMusic?.playing) {
       this.currentMusic.fade(1, 0, 1000);
-      await this.wait(1);
+      await new Promise(resolve => setTimeout(resolve, 1000));
       this.currentMusic.stop();
     }
 
     // Create new audio source
-    const musicGO = new GameObject('Music');
-    this.currentMusic = musicGO.addComponent(AudioSourceComponent, {
+    this.currentMusic = new AudioSource({
       src,
       category: 'music',
       loop: true,
     });
+
+    await this.currentMusic.load();
 
     // Fade in
     this.currentMusic.play();
@@ -284,17 +305,23 @@ class MusicPlayer extends Behavior {
 ### Sound Pool for Rapid SFX
 
 ```typescript
-class Weapon extends Behavior {
-  private audioSource!: AudioSourceComponent;
+import { AudioSource } from 'bonk-engine';
 
-  start() {
-    this.audioSource = this.getComponent(AudioSourceComponent)!;
+class Weapon {
+  private gunshotSound: AudioSource;
+
+  constructor() {
+    this.gunshotSound = new AudioSource({
+      src: './audio/sfx/gunshot.wav',
+      category: 'sfx',
+    });
+    this.gunshotSound.load();
   }
 
   fire() {
     // playOneShot creates independent instances
     // Won't cut off previous sounds
-    this.audioSource.playOneShot('./audio/sfx/gunshot.wav');
+    this.gunshotSound.playOneShot();
   }
 }
 ```
@@ -302,7 +329,9 @@ class Weapon extends Behavior {
 ### Volume Settings UI
 
 ```typescript
-class VolumeSettings extends Behavior {
+import { getAudioManager } from 'bonk-engine';
+
+class VolumeSettings {
   onMasterChange(value: number) {
     getAudioManager().setVolume('master', value);
   }
@@ -314,6 +343,31 @@ class VolumeSettings extends Behavior {
   onSFXChange(value: number) {
     getAudioManager().setVolume('sfx', value);
   }
+}
+```
+
+### Background Music with Auto-Unlock
+
+```typescript
+import { AudioSource, getAudioManager } from 'bonk-engine';
+
+const music = new AudioSource({
+  src: './audio/music.mp3',
+  category: 'music',
+  loop: true,
+  volume: 0.5,
+});
+
+await music.load();
+
+// Play when audio unlocks
+const audio = getAudioManager();
+if (audio.isUnlocked()) {
+  music.play();
+} else {
+  audio.onUnlock(() => {
+    music.play();
+  });
 }
 ```
 

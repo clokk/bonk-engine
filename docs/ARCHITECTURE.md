@@ -2,184 +2,33 @@
 
 ## Overview
 
-Bonk Engine is a 2D game engine with two distinct phases:
+Bonk Engine is a 2D game runtime library. It provides rendering, physics, input, audio, and cross-platform builds as importable TypeScript modules. Games bring their own architecture.
 
-1. **Runtime** (current focus) - Vanilla TypeScript game loop, no React
-2. **Editor** (future) - React-based scene editor with embedded viewport
-
-This document covers the runtime architecture.
-
-## Build Pipeline
+## Module Structure
 
 ```
-BUILD TIME                                    RUNTIME
-─────────────────────────────────────────    ─────────────────────────────
-public/scenes/*.json  ──────────────────► SceneLoader
-public/prefabs/*.json ──────────────────►     │
-                                              │
-behaviors/*.ts     ───────► esbuild ─────────►│
-                                                                    │
-                                                                    ▼
-                                              Vanilla TS Game Loop (No React)
-                                                     │
-                                          ┌──────────┴──────────┐
-                                          ▼                     ▼
-                                    PixiJS Renderer       Matter.js Physics
+@bonk/runtime     Game loop, time, lifecycle
+@bonk/render      PixiJS: sprites, animated sprites, text, cameras
+@bonk/physics     Matter.js rigid body + Verlet kinematic (planned)
+@bonk/input       Keyboard, mouse, touch, gamepad
+@bonk/audio       Howler.js: music, SFX, spatial audio
+@bonk/math        vec2 utilities, common game math
+@bonk/build       Build targets: browser, Tauri, Capacitor
 ```
 
-### Scene Format
-
-Scenes and prefabs are stored as JSON in `public/scenes/` and `public/prefabs/`. The engine's `SceneLoader` fetches these via HTTP at runtime. Scenes are pure data — fast loading, small bundle.
-
-## Core Classes
-
-### GameObject
-
-Container for components and behaviors. Always has a Transform.
+A game imports what it needs:
 
 ```typescript
-class GameObject {
-  name: string;
-  tag?: string;
-  layer?: string;
-  enabled: boolean;
-  transform: Transform;
-
-  // Component access
-  getComponent<T>(type: new (...) => T): T | null;
-  addComponent<T>(type: new (...) => T): T;
-
-  // Behavior access
-  getBehavior<T>(type: new (...) => T): T | null;
-
-  // Hierarchy
-  parent: GameObject | null;
-  children: GameObject[];
-}
-```
-
-### Transform
-
-2D positioning with hierarchy support.
-
-```typescript
-class Transform {
-  position: Vector2;      // Local
-  rotation: number;       // Degrees
-  scale: Vector2;
-  zIndex: number;
-
-  // World-space (computed from hierarchy)
-  worldPosition: Vector2;
-  worldRotation: number;
-  worldScale: Vector2;
-}
-```
-
-### Component
-
-Base class for data/functionality attached to GameObjects.
-
-```typescript
-abstract class Component {
-  readonly gameObject: GameObject;
-  enabled: boolean;
-  abstract readonly type: string;
-
-  // Lifecycle
-  awake(): void;
-  start(): void;
-  update(): void;
-  fixedUpdate(): void;
-  onDestroy(): void;
-}
-```
-
-### Behavior
-
-Extended Component with game logic patterns (Unity's MonoBehaviour equivalent).
-
-```typescript
-abstract class Behavior extends Component {
-  // Inherited lifecycle + additional features
-  lateUpdate(): void;
-
-  // Collision callbacks
-  onCollisionEnter(other: GameObject): void;
-  onTriggerEnter(other: GameObject): void;
-
-  // Utilities
-  find(name: string): GameObject | null;
-  findWithTag(tag: string): GameObject[];
-  instantiate(prefab: Prefab): GameObject;
-  destroy(obj: GameObject, delay?: number): void;
-
-  // Coroutines
-  startCoroutine(generator: Generator): CoroutineHandle;
-  wait(seconds: number): YieldInstruction;
-}
-```
-
-## Abstractions
-
-### Rendering
-
-The rendering system is abstracted to allow different backends:
-
-```
-┌─────────────────────────────────────────────────────┐
-│  Interface: Renderer                                │
-│  ┌───────────────────────────────────────────────┐  │
-│  │  init(config) → canvas                        │  │
-│  │  createSprite(config) → RenderObject          │  │
-│  │  removeObject(object)                         │  │
-│  │  render()                                     │  │
-│  └───────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────┘
-                        │
-                        ▼
-┌─────────────────────────────────────────────────────┐
-│  Implementation: PixiRenderer (PixiJS v8)           │
-│  - PIXI.Application wrapper                         │
-│  - Sortable container for z-index                   │
-│  - Texture caching via PIXI.Assets                  │
-└─────────────────────────────────────────────────────┘
-```
-
-**RenderObject** wraps PixiJS display objects:
-- `setPosition(x, y)` - World position
-- `setRotation(degrees)` - Rotation in degrees
-- `setScale(x, y)` - Scale
-- `setAlpha(alpha)` - Transparency
-- `zIndex` - Render order
-
-**Global Singleton**: Access via `getRenderer()` (matches `World` pattern).
-
-### Physics
-
-Similar abstraction for physics:
-
-```
-┌─────────────────────────────────────────────────────┐
-│  Interface: PhysicsWorld                            │
-│  ┌───────────────────────────────────────────────┐  │
-│  │  createBody(config) → PhysicsBody             │  │
-│  │  addCollider(body, config)                    │  │
-│  │  step(dt)                                     │  │
-│  │  raycast(origin, dir, dist) → RaycastHit      │  │
-│  └───────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────┘
-                        │
-                        ▼
-┌─────────────────────────────────────────────────────┐
-│  Implementation: MatterPhysicsWorld (Matter.js)     │
-│  - Matter.Engine wrapper                            │
-│  - Collision callbacks                              │
-│  - Body-to-GameObject mapping                       │
-└─────────────────────────────────────────────────────┘
+import { Game } from '@bonk/runtime';
+import { Sprite, Camera } from '@bonk/render';
+import { RigidBody, Collider } from '@bonk/physics';
+import { Input } from '@bonk/input';
+import { vec2 } from '@bonk/math';
 ```
 
 ## Game Loop
+
+The `Game` class owns the core loop: fixed timestep for physics, variable timestep for rendering.
 
 ```typescript
 function gameLoop() {
@@ -189,16 +38,13 @@ function gameLoop() {
   // Fixed timestep for physics (accumulator pattern)
   accumulator += dt;
   while (accumulator >= fixedTimestep) {
-    scene.fixedUpdate();  // Physics, deterministic logic
+    game.fixedUpdate();   // Physics, deterministic logic
     accumulator -= fixedTimestep;
   }
 
   // Variable timestep
-  scene.update();       // Game logic
-  scene.lateUpdate();   // Camera follow, etc.
-
-  // Cleanup
-  scene.processPendingDestroy();
+  game.update();          // Game logic
+  game.lateUpdate();      // Camera follow, post-processing
 
   // Render
   renderer.render();
@@ -207,74 +53,129 @@ function gameLoop() {
 }
 ```
 
-## Scene Lifecycle
+Games register callbacks:
 
-```
-Load Scene JSON
-      │
-      ▼
-Create GameObjects
-      │
-      ▼
-Create Components & Behaviors
-      │
-      ▼
-   awake()  ────► All objects created, references can be resolved
-      │
-      ▼
-   start()  ────► Safe to interact with other objects
-      │
-      ▼
-  Game Loop
-   ┌──────────────────────────────────────────┐
-   │  fixedUpdate() → update() → lateUpdate() │
-   └──────────────────────────────────────────┘
-      │
-      ▼ (on destroy)
- onDestroy()
+```typescript
+const game = new Game({ width: 800, height: 600 });
+
+game.onFixedUpdate(() => {
+  // Physics-rate logic (60Hz)
+});
+
+game.onUpdate((dt) => {
+  // Per-frame logic
+});
+
+game.onLateUpdate(() => {
+  // Post-update (camera, etc.)
+});
+
+game.start();
 ```
 
-## Future: npm Package Extraction
+## Rendering
 
-The engine is structured for eventual extraction to `@bonk/engine`:
-
-```
-@bonk/engine (npm package)
-├── GameObject, Transform, Component, Behavior
-├── Scene, SceneLoader
-├── rendering/
-├── physics/
-├── Time, Input, Events
-└── types/
-
-Game Project (uses @bonk/engine)
-├── behaviors/
-├── scenes/
-├── prefabs/
-└── assets/
-```
-
-The current monorepo structure (`src/engine/` + demo game) will split into:
-1. Engine package (publishable)
-2. Demo game (example project)
-3. CLI tool (scaffolding)
-
-## Future: Editor Architecture
+PixiJS v8 abstracted behind a clean API. Games don't touch Pixi directly.
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│  Editor (React + Radix)                                     │
-│  ┌───────────────────────────────────────────────────────┐  │
-│  │  Game Viewport (Canvas)                               │  │
-│  │  - Vanilla game loop                                  │  │
-│  │  - PixiJS rendering                                   │  │
-│  │  - No React at runtime                                │  │
-│  └───────────────────────────────────────────────────────┘  │
-│  ┌─────────────┬──────────────┬──────────────────────────┐  │
-│  │  Hierarchy  │  Inspector   │  Claude Code Terminal    │  │
-│  │  Panel      │  Panel       │  Integration             │  │
-│  └─────────────┴──────────────┴──────────────────────────┘  │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────┐
+│  @bonk/render                                       │
+│  ┌───────────────────────────────────────────────┐  │
+│  │  Sprite(src, position) → SpriteHandle         │  │
+│  │  AnimatedSprite(config) → AnimatedHandle      │  │
+│  │  Text(content, style) → TextHandle            │  │
+│  │  Camera: follow, zoom, bounds                 │  │
+│  └───────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────┘
+                        │
+                        ▼
+┌─────────────────────────────────────────────────────┐
+│  PixiJS v8 (internal)                               │
+│  - PIXI.Application wrapper                         │
+│  - Sortable container for z-index                   │
+│  - Texture caching via PIXI.Assets                  │
+└─────────────────────────────────────────────────────┘
 ```
 
-Key principle: **React for editor UI, vanilla TS for game runtime**. The viewport is a canvas element managed by the game loop, embedded in the React shell.
+## Physics
+
+Matter.js for rigid body dynamics. Verlet kinematic system planned for projectiles, particles, and game-owned collision response.
+
+```
+┌─────────────────────────────────────────────────────┐
+│  @bonk/physics                                      │
+│  ┌───────────────────────────────────────────────┐  │
+│  │  PhysicsWorld: step, gravity, raycast, query  │  │
+│  │  RigidBody: create, forces, velocity          │  │
+│  │  Collider: box, circle, polygon, sensor       │  │
+│  │  CollisionLayers: name-to-bitmask registry    │  │
+│  │  Callbacks: onCollision, onTrigger            │  │
+│  └───────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────┘
+                        │
+                        ▼
+┌─────────────────────────────────────────────────────┐
+│  Matter.js (internal)                               │
+│  - Rigid body dynamics                              │
+│  - Shape-vs-shape collision                         │
+│  - Contact solving                                  │
+└─────────────────────────────────────────────────────┘
+```
+
+Planned: Verlet kinematic system for lightweight physics (projectiles, particles) where the game owns collision response.
+
+## Input
+
+```typescript
+// Named axes and buttons (configurable)
+const moveX = Input.getAxisRaw('horizontal');  // -1, 0, or 1
+const jump = Input.getButtonDown('jump');       // true on press frame
+
+// Raw key access
+const shift = Input.getKey('ShiftLeft');
+
+// Mouse
+const [mx, my] = Input.mousePosition;
+const click = Input.getMouseButtonDown(0);
+```
+
+## Audio
+
+Howler.js with volume categories and spatial audio:
+
+```typescript
+import { AudioManager } from '@bonk/audio';
+
+AudioManager.playMusic('bgm.mp3', { volume: 0.5, loop: true });
+AudioManager.playSFX('explosion.wav', { volume: 0.8 });
+```
+
+## Cross-Platform Builds
+
+Same game code runs everywhere. The build system handles platform differences.
+
+```
+TypeScript Game Code
+        │
+        ├── npm run build:web    → Vite → static site (any web host)
+        ├── npm run build:tauri  → Tauri → native desktop (Steam-ready)
+        └── npm run build:mobile → Capacitor → iOS/Android
+```
+
+## Project Structure
+
+```
+bonk-engine/
+├── src/
+│   ├── runtime/       # Game, Time, Scheduler, EventSystem, Transform
+│   ├── render/        # Renderer, PixiRenderer, Sprite, AnimatedSprite, Camera
+│   ├── physics/       # PhysicsWorld, MatterPhysicsWorld, CollisionLayers, RigidBody
+│   ├── input/         # Input
+│   ├── audio/         # AudioManager, AudioSource
+│   ├── math/          # vec2
+│   ├── ui/            # UIManager, UIElement, primitives, layout
+│   ├── types.ts       # Shared types (Vector2, AxisConfig, TransformJson, etc.)
+│   ├── index.ts       # Public API barrel export
+│   └── main.ts        # Example game
+└── docs/              # Documentation
+```

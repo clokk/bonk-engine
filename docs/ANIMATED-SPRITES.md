@@ -1,28 +1,41 @@
 # Animated Sprites
 
-Bonk Engine supports sprite sheet animation through the `AnimatedSprite` component.
+Bonk Engine supports sprite sheet animation through the `AnimatedSprite` class.
 
 ## Basic Usage
 
-Add an AnimatedSprite component to a GameObject:
+Create an animated sprite using the runtime API:
 
-```json
-{
-  "name": "Player",
-  "transform": { "position": [400, 300], "rotation": 0, "scale": [1, 1] },
-  "components": [{
-    "type": "AnimatedSprite",
-    "src": "./sprites/player-sheet.png",
-    "frameWidth": 32,
-    "frameHeight": 32,
-    "animations": {
-      "idle": { "frames": [0, 1, 2, 3], "frameRate": 8, "loop": true },
-      "run": { "frames": [4, 5, 6, 7, 8, 9], "frameRate": 12, "loop": true },
-      "jump": { "frames": [10, 11], "frameRate": 10, "loop": false }
-    },
-    "defaultAnimation": "idle"
-  }]
-}
+```typescript
+import { AnimatedSprite, Game, Transform } from 'bonk-engine';
+
+const game = new Game({ width: 800, height: 600 });
+
+// Create a transform for position/rotation/scale
+const playerTransform = new Transform({
+  position: { x: 400, y: 300 },
+  rotation: 0,
+  scale: { x: 1, y: 1 },
+});
+
+// Create animated sprite
+const playerAnim = new AnimatedSprite(game.renderer, {
+  src: './sprites/player-sheet.png',
+  frameWidth: 32,
+  frameHeight: 32,
+  animations: {
+    idle: { frames: [0, 1, 2, 3], frameRate: 8, loop: true },
+    run: { frames: [4, 5, 6, 7, 8, 9], frameRate: 12, loop: true },
+    jump: { frames: [10, 11], frameRate: 10, loop: false },
+  },
+  defaultAnimation: 'idle',
+  transform: playerTransform, // Optional: auto-syncs position from transform
+});
+
+// Update in game loop
+game.onUpdate((dt: number) => {
+  playerAnim.update(dt); // Must call update() each frame
+});
 ```
 
 ## Sprite Sheet Layout
@@ -39,7 +52,7 @@ Frames are numbered left-to-right, top-to-bottom:
 └───────┴───────┴───────┴───────┘
 ```
 
-## Properties
+## Constructor Options
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
@@ -49,6 +62,7 @@ Frames are numbered left-to-right, top-to-bottom:
 | `animations` | `object` | - | Named animation definitions (see below) |
 | `defaultAnimation` | `string` | - | Animation to play on start |
 | `anchor` | `[x, y]` | `[0.5, 0.5]` | Anchor point (0-1) |
+| `transform` | `Transform` | - | Optional Transform for auto-syncing position |
 
 ### Animation Definition
 
@@ -62,29 +76,31 @@ Each animation is an object with:
 
 ## Runtime Control
 
-Control animations from behavior scripts:
+Control animations directly on the AnimatedSprite instance:
 
 ```typescript
-// Get the component
-const anim = this.gameObject.getComponent(AnimatedSpriteComponent);
+import { AnimatedSprite } from 'bonk-engine';
 
 // Switch animations
-anim.playAnimation('run');
-anim.playAnimation('attack', true); // Force restart even if already playing
+playerAnim.playAnimation('run');
+playerAnim.playAnimation('attack', true); // Force restart even if already playing
 
 // Pause/resume
-anim.stop();
-anim.play();
+playerAnim.stop();
+playerAnim.play();
 
 // Jump to specific frame
-anim.gotoFrame(0);       // Show frame, stay paused
-anim.gotoFrame(3, true); // Show frame and continue playing
+playerAnim.gotoFrame(0);       // Show frame, stay paused
+playerAnim.gotoFrame(3, true); // Show frame and continue playing
 
 // Query state
-anim.getCurrentAnimation();  // 'run'
-anim.isAnimationPlaying();   // true
-anim.hasAnimation('jump');   // true
-anim.getAnimationNames();    // ['idle', 'run', 'jump']
+playerAnim.getCurrentAnimation();  // 'run'
+playerAnim.isAnimationPlaying();   // true
+playerAnim.hasAnimation('jump');   // true
+playerAnim.getAnimationNames();    // ['idle', 'run', 'jump']
+
+// Sync position from transform (if using separate Transform)
+playerAnim.sync();
 ```
 
 ## Callbacks
@@ -92,17 +108,15 @@ anim.getAnimationNames();    // ['idle', 'run', 'jump']
 React to animation events:
 
 ```typescript
-const anim = this.gameObject.getComponent(AnimatedSpriteComponent);
-
 // Called when a non-looping animation finishes
-anim.onAnimationComplete = (name) => {
+playerAnim.onAnimationComplete = (name: string) => {
   if (name === 'attack') {
-    anim.playAnimation('idle');
+    playerAnim.playAnimation('idle');
   }
 };
 
 // Called every time the frame changes
-anim.onFrameChange = (frameIndex, animName) => {
+playerAnim.onFrameChange = (frameIndex: number, animName: string) => {
   if (animName === 'walk' && frameIndex === 2) {
     // Play footstep sound on specific frame
     playSound('footstep');
@@ -123,40 +137,40 @@ anim.onFrameChange = (frameIndex, animName) => {
 
 The `frames` array gives you full control over playback order:
 
-```json
-"animations": {
-  "walk": { "frames": [0, 1, 2, 3], "frameRate": 12, "loop": true },
-  "breathe": { "frames": [0, 1, 2, 1], "frameRate": 6, "loop": true },
-  "dash": { "frames": [0, 2, 4, 6], "frameRate": 16, "loop": false },
-  "charge": { "frames": [0, 0, 0, 1, 2, 3], "frameRate": 12, "loop": false },
-  "rewind": { "frames": [7, 6, 5, 4, 3, 2, 1, 0], "frameRate": 12, "loop": false }
-}
+```typescript
+const animations = {
+  walk: { frames: [0, 1, 2, 3], frameRate: 12, loop: true },
+  breathe: { frames: [0, 1, 2, 1], frameRate: 6, loop: true },
+  dash: { frames: [0, 2, 4, 6], frameRate: 16, loop: false },
+  charge: { frames: [0, 0, 0, 1, 2, 3], frameRate: 12, loop: false },
+  rewind: { frames: [7, 6, 5, 4, 3, 2, 1, 0], frameRate: 12, loop: false },
+};
 ```
 
 ## Flipping Sprites
 
-Use `flipX` and `flipY` to mirror the sprite:
-
-```json
-{
-  "type": "AnimatedSprite",
-  "src": "./sprites/player.png",
-  "frameWidth": 32,
-  "frameHeight": 32,
-  "animations": { "walk": { "frames": [0, 1, 2, 3], "frameRate": 12, "loop": true } },
-  "flipX": true
-}
-```
-
-Or toggle at runtime:
+Use `flipX` and `flipY` properties to mirror the sprite:
 
 ```typescript
-// In behavior script
+// Create with initial flip
+const flippedSprite = new AnimatedSprite(game.renderer, {
+  src: './sprites/player.png',
+  frameWidth: 32,
+  frameHeight: 32,
+  animations: {
+    walk: { frames: [0, 1, 2, 3], frameRate: 12, loop: true },
+  },
+});
+
+// Toggle at runtime
 if (velocity.x < 0) {
-  anim.flipX = true;  // Moving left, face left
+  flippedSprite.flipX = true;  // Moving left, face left
 } else if (velocity.x > 0) {
-  anim.flipX = false; // Moving right, face right
+  flippedSprite.flipX = false; // Moving right, face right
 }
+
+// Vertical flip
+flippedSprite.flipY = true; // Upside down
 ```
 
 ## Creating Sprite Sheets
@@ -177,50 +191,65 @@ Tools for creating sprite sheets:
 
 Complete player setup with multiple animations:
 
-```json
-{
-  "name": "Player",
-  "tag": "Player",
-  "transform": { "position": [400, 300], "rotation": 0, "scale": [1, 1] },
-  "components": [{
-    "type": "AnimatedSprite",
-    "src": "./sprites/hero-sheet.png",
-    "frameWidth": 48,
-    "frameHeight": 64,
-    "animations": {
-      "idle": { "frames": [0, 1, 2, 3], "frameRate": 8, "loop": true },
-      "run": { "frames": [8, 9, 10, 11, 12, 13], "frameRate": 12, "loop": true },
-      "jump": { "frames": [16, 17], "frameRate": 10, "loop": false },
-      "fall": { "frames": [18], "frameRate": 1, "loop": false },
-      "attack": { "frames": [24, 25, 26, 27], "frameRate": 16, "loop": false }
-    },
-    "defaultAnimation": "idle",
-    "anchor": [0.5, 1]
-  }],
-  "behaviors": [{ "src": "./behaviors/PlayerController.ts" }]
-}
-```
-
-With controller behavior:
-
 ```typescript
-// PlayerController.ts
-update() {
-  const anim = this.gameObject.getComponent(AnimatedSpriteComponent);
+import { AnimatedSprite, Game, Transform } from 'bonk-engine';
 
-  if (this.isGrounded) {
-    if (Math.abs(this.velocity.x) > 10) {
-      anim.playAnimation('run');
-      anim.flipX = this.velocity.x < 0;
+const game = new Game({ width: 800, height: 600 });
+
+// Create player transform
+const playerTransform = new Transform({
+  position: { x: 400, y: 300 },
+  rotation: 0,
+  scale: { x: 1, y: 1 },
+});
+
+// Create animated sprite with multiple animations
+const playerAnim = new AnimatedSprite(game.renderer, {
+  src: './sprites/hero-sheet.png',
+  frameWidth: 48,
+  frameHeight: 64,
+  animations: {
+    idle: { frames: [0, 1, 2, 3], frameRate: 8, loop: true },
+    run: { frames: [8, 9, 10, 11, 12, 13], frameRate: 12, loop: true },
+    jump: { frames: [16, 17], frameRate: 10, loop: false },
+    fall: { frames: [18], frameRate: 1, loop: false },
+    attack: { frames: [24, 25, 26, 27], frameRate: 16, loop: false },
+  },
+  defaultAnimation: 'idle',
+  anchor: [0.5, 1], // Bottom-center anchor for ground alignment
+  transform: playerTransform,
+});
+
+// Player state
+let velocity = { x: 0, y: 0 };
+let isGrounded = true;
+
+// Game loop
+game.onUpdate((dt: number) => {
+  // Update animation based on player state
+  if (isGrounded) {
+    if (Math.abs(velocity.x) > 10) {
+      playerAnim.playAnimation('run');
+      playerAnim.flipX = velocity.x < 0;
     } else {
-      anim.playAnimation('idle');
+      playerAnim.playAnimation('idle');
     }
   } else {
-    if (this.velocity.y < 0) {
-      anim.playAnimation('jump');
+    if (velocity.y < 0) {
+      playerAnim.playAnimation('jump');
     } else {
-      anim.playAnimation('fall');
+      playerAnim.playAnimation('fall');
     }
   }
-}
+
+  // Update animation (required each frame)
+  playerAnim.update(dt);
+});
+
+// Handle attack animation completion
+playerAnim.onAnimationComplete = (name: string) => {
+  if (name === 'attack') {
+    playerAnim.playAnimation('idle');
+  }
+};
 ```

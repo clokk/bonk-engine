@@ -7,11 +7,13 @@ Bonk Engine provides a Unity-familiar input system with named axes and buttons, 
 Axes return a value between -1 and 1, useful for continuous movement.
 
 ```typescript
+import { Input } from 'bonk-engine';
+
 // Smoothed value (accelerates/decelerates)
-const moveX = this.getAxis('horizontal');
+const moveX = Input.getAxis('horizontal');
 
 // Raw value (instant -1, 0, or 1)
-const moveX = this.getAxisRaw('horizontal');
+const moveX = Input.getAxisRaw('horizontal');
 ```
 
 ### Default Axes
@@ -24,7 +26,7 @@ const moveX = this.getAxisRaw('horizontal');
 ### Custom Axes
 
 ```typescript
-import { Input } from '../src/engine/Input';
+import { Input } from 'bonk-engine';
 
 Input.setAxis('strafe', {
   positive: ['KeyE'],
@@ -40,14 +42,16 @@ Input.setAxis('strafe', {
 Buttons are for discrete actions (jump, fire, interact).
 
 ```typescript
+import { Input } from 'bonk-engine';
+
 // Held down right now
-if (this.getButton('jump')) { ... }
+if (Input.getButton('jump')) { ... }
 
 // Pressed this frame (single-frame true)
-if (this.getButtonDown('fire')) { ... }
+if (Input.getButtonDown('fire')) { ... }
 
 // Released this frame
-if (this.getButtonUp('jump')) { ... }
+if (Input.getButtonUp('jump')) { ... }
 ```
 
 ### Default Buttons
@@ -70,39 +74,50 @@ Input.setButton('interact', {
 Access any key directly using [KeyboardEvent.code](https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/code) values:
 
 ```typescript
-if (this.getKey('ShiftLeft')) { ... }       // held
-if (this.getKeyDown('KeyP')) { ... }        // pressed this frame
-if (this.getKeyUp('Escape')) { ... }        // released this frame
+import { Input } from 'bonk-engine';
+
+if (Input.getKey('ShiftLeft')) { ... }       // held
+if (Input.getKeyDown('KeyP')) { ... }        // pressed this frame
+if (Input.getKeyUp('Escape')) { ... }        // released this frame
 ```
 
 ## Mouse
 
 ```typescript
+import { Input } from 'bonk-engine';
+
 // Position relative to canvas
-const [mx, my] = this.mousePosition;
+const [mx, my] = Input.mousePosition;
 
 // Mouse buttons: 0=left, 1=middle, 2=right
-if (this.getMouseButton(0)) { ... }         // held
-if (this.getMouseButtonDown(2)) { ... }     // right-click this frame
+if (Input.getMouseButton(0)) { ... }         // held
+if (Input.getMouseButtonDown(2)) { ... }     // right-click this frame
 ```
 
-## Using Input in Behaviors
+## Using Input in Game Code
 
-All input methods are available as `this.*` shortcuts on `Behavior`:
+All input methods are static on the `Input` class:
 
 ```typescript
-class PlayerController extends Behavior {
+import { Input, Runtime } from 'bonk-engine';
+
+class PlayerController {
   speed: number = 200;
   jumpForce: number = 400;
+  entityId: string;
 
-  update(): void {
+  constructor(entityId: string) {
+    this.entityId = entityId;
+  }
+
+  update(dt: number): void {
     // Movement
-    const dx = this.getAxisRaw('horizontal') * this.speed * this.deltaTime;
-    this.transform.translate(dx, 0);
+    const dx = Input.getAxisRaw('horizontal') * this.speed * dt;
+    Runtime.transform.translate(this.entityId, dx, 0);
 
     // Jump
-    if (this.getButtonDown('jump')) {
-      this.rigidbody?.applyImpulse([0, -this.jumpForce]);
+    if (Input.getButtonDown('jump')) {
+      Runtime.rigidbody.applyImpulse(this.entityId, [0, -this.jumpForce]);
     }
   }
 }

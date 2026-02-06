@@ -4,14 +4,12 @@ The UI system provides screen-space interface elements for menus, HUDs, and over
 
 ## Key Concepts
 
-### UIElement vs Component
+### Screen-Space vs World-Space
 
-The UI system is **separate from the Component/Behavior hierarchy**:
+- **Game objects** (sprites, physics bodies) exist in world-space and are affected by the camera
+- **UIElements** render in screen-space — fixed on screen regardless of camera position/zoom
 
-- **Components** attach to GameObjects and exist in world-space (affected by camera)
-- **UIElements** render in screen-space (fixed on screen regardless of camera)
-
-This separation keeps concerns clean—UI positioning works fundamentally differently from game object positioning.
+This separation keeps concerns clean. UI positioning works fundamentally differently from game object positioning.
 
 ### Architecture
 

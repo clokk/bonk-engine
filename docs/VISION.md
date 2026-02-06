@@ -1,161 +1,103 @@
 # Bonk Engine Vision
 
-A 2D game engine built for AI collaboration. JSON scenes that humans and LLMs can read, write, and iterate on together. Opinionated defaults, cross-platform export from day one.
+A 2D game runtime library built for AI collaboration. TypeScript-first, cross-platform, web-native. Claude writes the game, Bonk provides the capabilities.
 
-**Not** a library (like Phaser). A **product** - closer to Godot's positioning but TypeScript-native and web-first.
+**Not a framework.** A library. Bonk provides rendering, physics, input, audio, and cross-platform builds. Games bring their own architecture — Claude picks what fits.
 
 **The name:** Playful, memorable, approachable. Serious tech doesn't need a serious name. "Built with Bonk Engine" is both a flex and a conversation starter.
 
+## Core Thesis
+
+The best game engine for AI collaboration is a library, not a framework.
+
+Claude thinks in TypeScript. TypeScript IS the scene format. When you force game ideas through JSON or a component hierarchy, you strip away the things Claude is best at — conditionals, computation, abstraction, and choosing the right architecture per game.
+
+A platformer wants entity composition. A turn-based artillery game wants a state machine. A card game wants neither. The engine shouldn't impose an opinion. It should provide tools.
+
 ## Core Principles
 
-1. **TypeScript-first** - Types are guardrails for AI-generated code. The compiler catches mistakes before runtime.
-2. **Unity-familiar, improved where clear** - Seasoned developers feel at home. We diverge only when there's obvious benefit.
-3. **JSON scenes are pure data** - Game loop owns rendering.
-4. **React for editor, vanilla TS for runtime** - No fighting the reconciler.
-5. **Component-based, not ECS** - Simpler mental model, sufficient for 2D scale.
-6. **Opinionated by default** - Make decisions so users don't have to.
-7. **Cross-platform from day one** - Web, desktop (Tauri), mobile (Capacitor).
-8. **AI-readable everything** - Scenes are code, not binaries.
-9. **Approachable over intimidating** - The meme-friendly name is intentional. Serious tech, welcoming vibe.
+1. **TypeScript is the scene format** — No JSON intermediary. Game code is the source of truth.
+2. **Library, not framework** — Import what you need. No forced architecture.
+3. **The library is never required** — Games are standalone TypeScript projects. `npm run dev` works without Bonk tooling. Bonk provides modules you import, not an environment you run inside.
+4. **Tooling is optional visibility** — Bonk's dev tooling (viewport overlays, debug wireframes, runtime inspection) gives humans visibility into what Claude built. It's a Vite plugin you add to your config — not a dependency your game needs to function.
+5. **Claude is the editor** — The terminal is the primary interface. The viewport is for visual feedback.
+6. **Cross-platform from day one** — Web, desktop (Tauri/Steam), mobile (Capacitor).
+7. **AI-readable everything** — All text, all TypeScript, all diffable and mergeable.
+8. **Opinionated runtime, unopinionated structure** — The game loop, physics timestep, and render pipeline are well-defined. How you organize your game is up to you.
+9. **Approachable over intimidating** — The meme-friendly name is intentional.
+
+## Library vs Tooling
+
+Bonk has two layers. Only the first is required.
+
+**`bonk-engine`** (the library) — TypeScript modules for rendering, physics, input, audio. Import what you need. Your game is a standard Vite + TypeScript project. `npm run dev` works. `npm run build` works. No special runtime, no wrapper, no CLI.
+
+**`bonk-vite-plugin`** (the tooling) — A Vite plugin that gives humans visibility into the game. Debug wireframes, physics body outlines, performance overlays, runtime state inspection. Add one line to `vite.config.ts` and it lights up. Remove it and nothing changes — your game still runs.
+
+```typescript
+// vite.config.ts — tooling is one optional line
+import { defineConfig } from 'vite';
+import bonk from 'bonk-vite-plugin'; // optional
+
+export default defineConfig({
+  plugins: [bonk()], // remove this line and your game still works
+});
+```
+
+This is the React / React DevTools split. The game never knows the tooling exists. The tooling subscribes to engine events (body created, collision fired, sprite added) that the library emits at zero cost when nobody's listening. In production builds, the plugin isn't included.
+
+**Why this matters for AI collaboration:** Claude writes game code against the library API. The human uses the tooling to see what Claude built — viewport, wireframes, state. Neither depends on the other. Claude doesn't need the tooling to write code. The human doesn't need Claude to use the tooling.
 
 ## AI Collaboration Design
 
 **Why this architecture helps AI:**
 
-1. **TypeScript throughout** - AI-generated code gets type-checked immediately
-2. **Behaviors are standalone files** - AI can generate/modify one file without touching others
-3. **JSON scenes are readable** - AI can understand existing scene structure
-4. **Unity-familiar patterns** - AI training data includes tons of Unity examples
-5. **No binary formats** - Everything is text, diffable, mergeable
+1. **Full TypeScript expressiveness** — Claude uses conditionals, loops, abstractions, and any architecture pattern. No data format bottleneck.
+2. **No translation layer** — Claude writes game code directly against the runtime API. No component registry, no scene loader, no serialization ceremony.
+3. **Hot reload via Vite HMR** — Claude edits a file, saves it, the game updates. Same developer experience as JSON hot reload, but with full language capabilities.
+4. **Each game gets the right architecture** — Claude evaluates the game's needs and picks the structure. A particle-heavy game gets object pools. A turn-based game gets a state machine. Nothing is forced.
+5. **The viewport provides verification** — Claude writes code, the human watches the game. "The jump feels floaty" → Claude adjusts parameters → immediate visual feedback.
 
 **The collaboration loop:**
 ```
-1. Human: "Let's make a platformer"
-2. Claude: Generates scene.json + PlayerController.ts
-3. Human: "The jump feels floaty"
-4. Claude: Reads PlayerController.ts, adjusts jumpForce/gravity
-5. Human: "Add double jump"
-6. Claude: Adds doubleJump logic, knows the patterns
-7. Human: Commits, ships to itch.io
-8. New session: Claude reads scene + behaviors, continues
+1. Human: "Let's make a worms-style artillery game"
+2. Claude: Creates terrain system, turn state machine, weapon definitions
+3. Human: "The explosions feel weak"
+4. Claude: Reads the code, adjusts blast radius / particle count / screen shake
+5. Human: "Ship it to Steam and web"
+6. Claude: npm run build:web / npm run build:tauri
 ```
 
-## Unity Patterns: Keep vs Improve
+## Why Not Scenes
 
-| Pattern | Unity | Bonk Engine | Rationale |
-|---------|-------|-------------|-----------|
-| Lifecycle hooks | Awake, Start, Update, etc. | **Same** | Familiar, well-understood |
-| GetComponent<T>() | Returns Component | **Same** | Intuitive API |
-| Transform always present | Yes | **Yes** | Good pattern |
-| Scene format | Binary/YAML | **JSON** | AI-readable, version control friendly |
-| Inspector serialization | C# attributes | **TypeScript types** | AI can read/write, no decorators needed |
-| Prefabs | Binary asset | **JSON prefab files** | Readable templates |
-| MonoBehaviour | C# class | **Behavior class** | Same concept, TypeScript |
-| deltaTime access | Time.deltaTime | **Passed to update(dt)** | Explicit, testable |
-| Find by name | GameObject.Find() | **this.find()** | Scoped to behavior, same concept |
-| Physics | PhysX (3D-focused) | **Matter.js** | 2D-native, simpler |
-| Coroutines | yield return | **Generator functions** | Modern JS, cleaner |
-| Events | C# events/UnityEvent | **TypeScript EventEmitter** | Standard patterns |
+The original architecture used JSON scenes + GameObject/Component/Behavior (Unity-style). This was retired because:
 
-### Improvement: Coroutines via Generators
-
-Unity:
-```csharp
-IEnumerator SpawnEnemies() {
-    while (true) {
-        Instantiate(enemyPrefab);
-        yield return new WaitForSeconds(2f);
-    }
-}
-```
-
-Bonk Engine:
-```typescript
-*spawnEnemies() {
-  while (this.enabled) {
-    this.instantiate(enemyPrefab);
-    yield* this.wait(2);
-  }
-}
-```
-
-### Improvement: Serialization via Types
-
-Unity requires attributes:
-```csharp
-[SerializeField] private float speed = 5f;
-[Range(0, 100)] public int health = 100;
-```
-
-Bonk Engine uses plain TypeScript:
-```typescript
-// Public properties are automatically serializable
-speed: number = 5;
-health: number = 100;
-
-// Private with underscore prefix excluded from inspector
-private _internalState: number = 0;
-```
-
-The JSON scene can set these directly:
-```json
-{ "src": "./behaviors/PlayerController.ts", "props": { "speed": 8, "health": 150 } }
-```
+- **Scenes imposed one architecture.** Every game forced into spatial-objects-with-components, regardless of fit.
+- **JSON is less expressive than TypeScript.** No conditionals, no computation, no abstraction.
+- **The "editor" is Claude Code.** Inspector panels are a slower interface to the same data Claude reads/writes directly.
+- **Scene infrastructure solved problems that don't exist in AI-first workflows.** Serialization for property panels, visual tweaking, non-programmer access — all handled by talking to Claude in English.
 
 ## Tech Stack
 
 | Layer | Choice | Rationale |
 |-------|--------|-----------|
 | Language | TypeScript (strict) | AI guardrails, type safety |
-| Editor UI | React 19 + Radix | Proven, declarative UI |
-| Rendering | PixiJS | Fast WebGL, not a framework |
-| Physics | Matter.js | Pure JS, 2D-native, simple |
-| Scene Format | JSON | AI-readable, data at runtime |
+| Rendering | PixiJS v8 | Fast WebGL, lightweight |
+| Physics | Matter.js + Verlet (planned) | 2D-native, dual-layer |
+| Audio | Howler.js | Handles browser quirks |
+| Input | Custom | Axes, buttons, raw keys |
 | Desktop | Tauri | 3-8MB vs Electron's 150MB |
 | Mobile | Capacitor | Clean native wrapper |
-| Build | Vite | Fast, standard |
-| Audio | Howler.js | Handles browser quirks |
-
-## MVP Scope
-
-### Phase 1: Core Runtime (current)
-
-1. JSON scene format
-2. Vanilla TS game loop with PixiJS
-3. GameObject, Transform, Component, Behavior classes
-4. Core components: Sprite, RigidBody2D, Collider2D
-5. Input, Time, SceneManager utilities
-6. `npm run dev` with hot-reload
-7. `npm run build:web` produces deployable bundle
-
-### Phase 2: Cross-Platform
-
-1. Tauri desktop builds
-2. Capacitor mobile builds
-3. Build pipeline automation
-
-### Phase 3: Editor
-
-1. React-based editor shell
-2. Hierarchy panel
-3. Inspector panel
-4. Viewport with scene editing
-5. Claude Code terminal integration
+| Build | Vite | Fast HMR, standard tooling |
 
 ## Export Targets
 
 ```bash
 npm run dev              # Hot-reload development
-npm run build:web        # → dist/web/
-npm run build:desktop    # → Tauri app
-npm run build:ios        # → Capacitor iOS
-npm run build:android    # → Capacitor Android
+npm run build            # → dist/ (production web build)
 ```
 
-Target bundle sizes:
-- Web: ~500KB - 2MB
-- Desktop: ~5MB (Tauri)
-- Mobile: Native wrapper + web bundle
+Cross-platform builds (Tauri desktop, Capacitor mobile) are planned but not yet implemented. Web is the primary target.
 
 ## Branding
 

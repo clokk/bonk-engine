@@ -5,10 +5,6 @@ node_modules/
 dist/
 *.tsbuildinfo
 
-# Generated scene JSON (build artifacts)
-public/scenes/*.json
-public/prefabs/*.json
-
 # IDE
 .idea/
 .vscode/
