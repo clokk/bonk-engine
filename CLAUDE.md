@@ -39,7 +39,7 @@ bonk-engine/
 ## How Games Use Bonk
 
 ```typescript
-import { Game, Sprite, Camera, RigidBody, Input, Time, Transform } from 'bonk-engine';
+import { Game, Sprite, Camera, RigidBody, Input, Time, Transform } from 'bonkjs';
 
 const game = new Game({ physics: { gravity: [0, 980] } });
 const canvas = await game.init({ width: 800, height: 600 });
@@ -133,8 +133,9 @@ Layer 3 never touches Layer 2. It subscribes to Layer 1's lifecycle events (body
 ## Commands
 
 ```bash
-npm run dev          # Hot-reload dev server (browser)
-npm run build        # Production build
+npm run dev          # Hot-reload dev server (browser, port 3000)
+npm run build        # Library build (ESM bundle + declarations → dist/)
+npm run build:watch  # Library build with file watching (for npm link workflow)
 npm run typecheck    # Type check only
 ```
 
@@ -151,3 +152,48 @@ npm run typecheck    # Type check only
 | `src/audio/AudioSource.ts` | Per-source audio playback |
 | `src/types.ts` | Shared types |
 | `docs/ARCHITECTURE.md` | Full architecture |
+
+## Using bonkjs as a Dependency
+
+Install in a game project:
+
+```bash
+npm install bonkjs
+```
+
+Import what you need:
+
+```typescript
+import { Game, Sprite, Camera, RigidBody, Input, Transform } from 'bonkjs';
+```
+
+### Dual-Dev Workflow (npm link)
+
+When developing the engine and a game simultaneously:
+
+```bash
+# Terminal 1: engine — rebuild on changes
+cd ~/bonk-engine && npm link && npm run build:watch
+
+# Terminal 2: game — link to local engine
+cd ~/my-game && npm link bonkjs && npm run dev
+```
+
+Editing engine source auto-rebuilds → game's Vite picks up changes.
+
+**Consumer's `vite.config.ts` additions:**
+
+```typescript
+server: {
+  fs: {
+    allow: ['..'],  // Vite blocks serving files outside project root
+  },
+},
+resolve: {
+  dedupe: ['pixi.js'],  // Prevents duplicate PixiJS copies via npm link
+},
+```
+
+**Gotchas:**
+- Run `npm run dev -- --force` if Vite's dependency pre-bundling cache is stale after linking
+- When done developing, `npm unlink bonkjs` and `npm install bonkjs` to switch back to the published version

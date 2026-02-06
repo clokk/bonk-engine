@@ -1,18 +1,43 @@
 import { defineConfig } from 'vite';
 import path from 'path';
+import dts from 'vite-plugin-dts';
 
-export default defineConfig({
-  resolve: {
-    alias: {
-      'bonk-engine': path.resolve(__dirname, 'src'),
+export default defineConfig(({ command }) => {
+  const shared = {
+    resolve: {
+      alias: {
+        'bonkjs': path.resolve(__dirname, 'src'),
+      },
     },
-  },
-  build: {
-    target: 'ES2022',
-    sourcemap: true,
-  },
-  server: {
-    port: 3000,
-    strictPort: true,
-  },
+  };
+
+  if (command === 'serve') {
+    return {
+      ...shared,
+      server: {
+        port: 3000,
+        strictPort: true,
+      },
+    };
+  }
+
+  // build — library mode
+  return {
+    ...shared,
+    build: {
+      lib: {
+        entry: path.resolve(__dirname, 'src/index.ts'),
+        formats: ['es'],
+        fileName: 'bonkjs',
+      },
+      rollupOptions: {
+        external: ['pixi.js', 'matter-js', 'howler'],
+      },
+      target: 'ES2022',
+      sourcemap: true,
+    },
+    plugins: [
+      dts({ tsconfigPath: './tsconfig.build.json' }),
+    ],
+  };
 });

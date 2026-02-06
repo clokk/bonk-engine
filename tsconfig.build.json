@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "./src"
+  },
+  "exclude": [
+    "node_modules",
+    "dist",
+    "src/main.ts",
+    "src/va-glow-test.ts",
+    "src/vite-env.d.ts"
+  ]
+}
