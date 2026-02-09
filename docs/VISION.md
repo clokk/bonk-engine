@@ -45,7 +45,7 @@ Bonk sandwiches the game in three layers. The game-specific code (Layer 2) is wh
 └─────────────────────────────────────────────────────────┘
 ```
 
-**Layer 1** (`bonk-engine`) — TypeScript modules for rendering, physics, input, audio. Import what you need. Your game is a standard Vite + TypeScript project. `npm run dev` works. `npm run build` works. No special runtime, no wrapper, no CLI.
+**Layer 1** (`bonkjs`) — TypeScript modules for rendering, physics, input, audio. Import what you need. Your game is a standard Vite + TypeScript project. `npm run dev` works. `npm run build` works. No special runtime, no wrapper, no CLI.
 
 **Layer 2** (game code) — Whatever Claude decides. Each game gets a fresh architecture. Nothing carries over except the Layer 1 primitives and Layer 3 tooling.
 

@@ -14,7 +14,7 @@ The audio system uses a hybrid approach:
 ### Basic Playback
 
 ```typescript
-import { AudioSource } from 'bonk-engine';
+import { AudioSource } from 'bonkjs';
 
 const music = new AudioSource({
   src: './audio/music.mp3',
@@ -30,7 +30,7 @@ music.play();
 ### One-Shot Sound Effects
 
 ```typescript
-import { AudioSource } from 'bonk-engine';
+import { AudioSource } from 'bonkjs';
 
 const coinSound = new AudioSource({
   src: './audio/sfx/coin.wav',
@@ -48,7 +48,7 @@ function collectCoin() {
 ### Volume Control
 
 ```typescript
-import { getAudioManager } from 'bonk-engine';
+import { getAudioManager } from 'bonkjs';
 
 const audio = getAudioManager();
 
@@ -111,7 +111,7 @@ audioSource.getDuration();  // number - total duration
 AudioManager auto-initializes when the first AudioSource loads. You can also initialize manually:
 
 ```typescript
-import { AudioManager } from 'bonk-engine';
+import { AudioManager } from 'bonkjs';
 
 AudioManager.init();
 ```
@@ -129,7 +129,7 @@ Example: master=0.8, music=0.5, audioSource=0.7 → effective=0.28
 ### Preloading
 
 ```typescript
-import { getAudioManager } from 'bonk-engine';
+import { getAudioManager } from 'bonkjs';
 
 const audio = getAudioManager();
 
@@ -172,7 +172,7 @@ audio.destroy();
 2D spatial audio uses stereo panning and distance-based volume falloff.
 
 ```typescript
-import { AudioSource, Transform } from 'bonk-engine';
+import { AudioSource, Transform } from 'bonkjs';
 
 const waterfall = new AudioSource({
   src: './audio/ambient/waterfall.mp3',
@@ -236,7 +236,7 @@ Modern browsers block autoplay until user interaction. The audio system handles 
 ### Checking Unlock Status
 
 ```typescript
-import { getAudioManager } from 'bonk-engine';
+import { getAudioManager } from 'bonkjs';
 
 const audio = getAudioManager();
 
@@ -255,7 +255,7 @@ audio.onUnlock(() => {
 ### Events
 
 ```typescript
-import { GlobalEvents, AudioEvents } from 'bonk-engine';
+import { GlobalEvents, AudioEvents } from 'bonkjs';
 
 // Audio unlocked
 GlobalEvents.on(AudioEvents.UNLOCKED, () => {
@@ -273,7 +273,7 @@ GlobalEvents.on(AudioEvents.VOLUME_CHANGED, ({ category, value }) => {
 ### Music Player with Crossfade
 
 ```typescript
-import { AudioSource } from 'bonk-engine';
+import { AudioSource } from 'bonkjs';
 
 class MusicPlayer {
   private currentMusic: AudioSource | null = null;
@@ -305,7 +305,7 @@ class MusicPlayer {
 ### Sound Pool for Rapid SFX
 
 ```typescript
-import { AudioSource } from 'bonk-engine';
+import { AudioSource } from 'bonkjs';
 
 class Weapon {
   private gunshotSound: AudioSource;
@@ -329,7 +329,7 @@ class Weapon {
 ### Volume Settings UI
 
 ```typescript
-import { getAudioManager } from 'bonk-engine';
+import { getAudioManager } from 'bonkjs';
 
 class VolumeSettings {
   onMasterChange(value: number) {
@@ -349,7 +349,7 @@ class VolumeSettings {
 ### Background Music with Auto-Unlock
 
 ```typescript
-import { AudioSource, getAudioManager } from 'bonk-engine';
+import { AudioSource, getAudioManager } from 'bonkjs';
 
 const music = new AudioSource({
   src: './audio/music.mp3',

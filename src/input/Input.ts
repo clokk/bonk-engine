@@ -4,6 +4,7 @@
  */
 
 import type { Vector2, AxisConfig, ButtonConfig, InputConfig } from '../types';
+import { Time } from '../runtime/Time';
 
 /** Default input configuration */
 const DEFAULT_CONFIG: InputConfig = {
@@ -189,7 +190,7 @@ export class Input {
   // ==================== Axis Updates ====================
 
   private static updateAxes(): void {
-    const dt = 1 / 60; // Use fixed timestep for consistent smoothing
+    const dt = Time.deltaTime || 1 / 60; // fallback before first Time.update()
 
     for (const [name, axisConfig] of Object.entries(this.config.axes)) {
       const rawValue = this.getAxisRaw(name);
@@ -299,6 +300,7 @@ export class Input {
 
   /**
    * Check if a key was pressed this frame.
+   * @param code KeyboardEvent.code (e.g., 'KeyW', 'Space', 'ArrowUp')
    */
   static getKeyDown(code: string): boolean {
     return this.keysDown.has(code);
@@ -306,6 +308,7 @@ export class Input {
 
   /**
    * Check if a key was released this frame.
+   * @param code KeyboardEvent.code (e.g., 'KeyW', 'Space', 'ArrowUp')
    */
   static getKeyUp(code: string): boolean {
     return this.keysUp.has(code);

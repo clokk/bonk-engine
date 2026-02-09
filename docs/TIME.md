@@ -20,7 +20,7 @@ Bonk Engine's `Time` class provides frame timing and time scaling.
 Import and use `Time` directly:
 
 ```typescript
-import { Time, Input } from 'bonk-engine';
+import { Time, Input } from 'bonkjs';
 
 game.onUpdate(() => {
   // Frame-rate independent movement
@@ -59,7 +59,7 @@ Time.timeScale = 2;
 Set `timeScale` to 0 to pause gameplay. Use `unscaledDeltaTime` for things that should still animate during pause (menu transitions, UI):
 
 ```typescript
-import { Time, Input } from 'bonk-engine';
+import { Time, Input } from 'bonkjs';
 
 game.onUpdate(() => {
   if (Input.getButtonDown('pause')) {
@@ -80,7 +80,7 @@ game.onUpdate(() => {
 Classic hit-stop effect using coroutines:
 
 ```typescript
-import { GlobalScheduler, Time } from 'bonk-engine';
+import { GlobalScheduler, Time } from 'bonkjs';
 
 function* hitFreeze() {
   Time.timeScale = 0.05;
@@ -141,7 +141,7 @@ Each frame:
 Register callbacks with the game instance:
 
 ```typescript
-import { Time, Input } from 'bonk-engine';
+import { Time, Input } from 'bonkjs';
 
 // Variable timestep - runs every frame
 game.onUpdate(() => {
@@ -165,7 +165,7 @@ game.onLateUpdate(() => {
 ### Frame-rate Independent Movement
 
 ```typescript
-import { Time, Input } from 'bonk-engine';
+import { Time, Input } from 'bonkjs';
 
 const speed = 100; // units per second
 
@@ -189,7 +189,7 @@ game.onUpdate(() => {
 ### Timers and Delays
 
 ```typescript
-import { GlobalScheduler, Time } from 'bonk-engine';
+import { GlobalScheduler, Time } from 'bonkjs';
 
 function* delayedAction() {
   console.log('Starting...');
@@ -209,7 +209,7 @@ GlobalScheduler.start(delayedAction);
 ### FPS Display
 
 ```typescript
-import { Time } from 'bonk-engine';
+import { Time } from 'bonkjs';
 
 game.onUpdate(() => {
   fpsText.text = `FPS: ${Math.round(Time.fps)}`;

@@ -7,7 +7,7 @@ Bonk Engine provides a Camera class for viewport control with smooth following, 
 Import and create a Camera:
 
 ```typescript
-import { Camera, Game } from 'bonk-engine';
+import { Camera, Game } from 'bonkjs';
 
 const game = new Game({ width: 800, height: 600 });
 const camera = new Camera(game.renderer, { followSmoothing: 8 });
@@ -28,7 +28,7 @@ const camera = new Camera(game.renderer, { followSmoothing: 8 });
 The camera smoothly follows a target using a function that returns the target's position:
 
 ```typescript
-import { Camera, Game, Transform } from 'bonk-engine';
+import { Camera, Game, Transform } from 'bonkjs';
 
 const game = new Game({ width: 800, height: 600 });
 const camera = new Camera(game.renderer, { followSmoothing: 10 });
@@ -103,7 +103,7 @@ Useful for level transitions or respawning.
 ## Complete Example
 
 ```typescript
-import { Camera, Game, Transform } from 'bonk-engine';
+import { Camera, Game, Transform } from 'bonkjs';
 
 const game = new Game({ width: 800, height: 600 });
 

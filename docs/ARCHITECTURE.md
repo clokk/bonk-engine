@@ -193,7 +193,7 @@ Layer 3 never touches Layer 2. The key contract: Layer 1 emits events, Layer 3 s
 ## Project Structure
 
 ```
-bonk-engine/
+bonkjs/
 ├── src/
 │   ├── runtime/       # Game, Time, Scheduler, EventSystem, Transform
 │   ├── render/        # Renderer, PixiRenderer, Sprite, AnimatedSprite, Camera

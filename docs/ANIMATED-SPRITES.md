@@ -7,7 +7,7 @@ Bonk Engine supports sprite sheet animation through the `AnimatedSprite` class.
 Create an animated sprite using the runtime API:
 
 ```typescript
-import { AnimatedSprite, Game, Transform } from 'bonk-engine';
+import { AnimatedSprite, Game, Transform } from 'bonkjs';
 
 const game = new Game({ width: 800, height: 600 });
 
@@ -79,7 +79,7 @@ Each animation is an object with:
 Control animations directly on the AnimatedSprite instance:
 
 ```typescript
-import { AnimatedSprite } from 'bonk-engine';
+import { AnimatedSprite } from 'bonkjs';
 
 // Switch animations
 playerAnim.playAnimation('run');
@@ -192,7 +192,7 @@ Tools for creating sprite sheets:
 Complete player setup with multiple animations:
 
 ```typescript
-import { AnimatedSprite, Game, Transform } from 'bonk-engine';
+import { AnimatedSprite, Game, Transform } from 'bonkjs';
 
 const game = new Game({ width: 800, height: 600 });
 

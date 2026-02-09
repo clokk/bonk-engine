@@ -7,7 +7,7 @@ Bonk Engine provides a Unity-familiar input system with named axes and buttons, 
 Axes return a value between -1 and 1, useful for continuous movement.
 
 ```typescript
-import { Input } from 'bonk-engine';
+import { Input } from 'bonkjs';
 
 // Smoothed value (accelerates/decelerates)
 const moveX = Input.getAxis('horizontal');
@@ -26,7 +26,7 @@ const moveX = Input.getAxisRaw('horizontal');
 ### Custom Axes
 
 ```typescript
-import { Input } from 'bonk-engine';
+import { Input } from 'bonkjs';
 
 Input.setAxis('strafe', {
   positive: ['KeyE'],
@@ -42,7 +42,7 @@ Input.setAxis('strafe', {
 Buttons are for discrete actions (jump, fire, interact).
 
 ```typescript
-import { Input } from 'bonk-engine';
+import { Input } from 'bonkjs';
 
 // Held down right now
 if (Input.getButton('jump')) { ... }
@@ -73,8 +73,19 @@ Input.setButton('interact', {
 
 Access any key directly using [KeyboardEvent.code](https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/code) values:
 
+> **Warning:** All key strings must use [`KeyboardEvent.code`](https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/code) format — the physical key position, not the character produced. Use the `Keys` constants to avoid mistakes.
+>
+> | Wrong (`event.key`) | Right (`event.code`) | Constant |
+> |---|---|---|
+> | `'g'` | `'KeyG'` | `Keys.G` |
+> | `' '` (space char) | `'Space'` | `Keys.Space` |
+> | `'w'` | `'KeyW'` | `Keys.W` |
+> | `'Shift'` | `'ShiftLeft'` | `Keys.ShiftLeft` |
+>
+> `event.key` strings silently fail — `Input.getKey('g')` always returns `false`.
+
 ```typescript
-import { Input } from 'bonk-engine';
+import { Input, Keys } from 'bonkjs';
 
 if (Input.getKey('ShiftLeft')) { ... }       // held
 if (Input.getKeyDown('KeyP')) { ... }        // pressed this frame
@@ -84,7 +95,7 @@ if (Input.getKeyUp('Escape')) { ... }        // released this frame
 ## Mouse
 
 ```typescript
-import { Input } from 'bonk-engine';
+import { Input } from 'bonkjs';
 
 // Position relative to canvas
 const [mx, my] = Input.mousePosition;
@@ -99,7 +110,7 @@ if (Input.getMouseButtonDown(2)) { ... }     // right-click this frame
 All input methods are static on the `Input` class:
 
 ```typescript
-import { Input, Runtime } from 'bonk-engine';
+import { Input, Runtime } from 'bonkjs';
 
 class PlayerController {
   speed: number = 200;

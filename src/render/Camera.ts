@@ -106,7 +106,7 @@ export class Camera {
       renderX += (Math.random() * 2 - 1) * this.shakeIntensity;
       renderY += (Math.random() * 2 - 1) * this.shakeIntensity;
 
-      this.shakeIntensity *= this.shakeDecay;
+      this.shakeIntensity *= Math.pow(this.shakeDecay, Time.deltaTime * 60);
 
       if (this.shakeDuration > 0) {
         this.shakeElapsed += Time.deltaTime;

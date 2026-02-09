@@ -9,7 +9,7 @@ A 2D game toolkit for AI collaboration. TypeScript-first. Bonk sandwiches the ga
 ## Project Structure
 
 ```
-bonk-engine/
+bonkjs/
 ├── src/
 │   ├── runtime/       # Game, Time, Scheduler, EventSystem, Transform
 │   ├── render/        # Renderer, PixiRenderer, Sprite, AnimatedSprite, Camera
@@ -173,7 +173,7 @@ When developing the engine and a game simultaneously:
 
 ```bash
 # Terminal 1: engine — rebuild on changes
-cd ~/bonk-engine && npm link && npm run build:watch
+cd ~/bonkjs && npm link && npm run build:watch
 
 # Terminal 2: game — link to local engine
 cd ~/my-game && npm link bonkjs && npm run dev
@@ -181,13 +181,15 @@ cd ~/my-game && npm link bonkjs && npm run dev
 
 Editing engine source auto-rebuilds → game's Vite picks up changes.
 
+> **Important:** Game projects import from `dist/`, not `src/`. Engine source changes are **invisible** to linked games until the library is rebuilt. Always keep `npm run build:watch` running in the engine terminal during development. If you edit engine source and the game doesn't reflect the change, this is almost certainly why.
+
 **Consumer's `vite.config.ts`** — must include resolve aliases for bonkjs's externalized deps:
 
 ```typescript
 import { defineConfig } from 'vite';
 import path from 'path';
 
-const bonkEngine = path.resolve(__dirname, '../bonk-engine');
+const bonkEngine = path.resolve(__dirname, '../bonkjs');
 
 export default defineConfig({
   server: {
@@ -214,7 +216,8 @@ export default defineConfig({
 **Why the aliases?** bonkjs externalizes pixi.js, matter-js, and howler in its library build. Via `npm link`, Vite/Rollup can't resolve these through the symlink — the alias tells it exactly where to find them. This won't be needed once bonkjs is published to npm.
 
 **Gotchas:**
-- Run `npm run dev -- --force` if Vite's dependency pre-bundling cache is stale after linking
+- **`build:watch` must be running** — without it, engine edits won't reach the game. If changes seem ignored, check that the engine's `dist/` has been rebuilt (`npm run build` or `npm run build:watch`)
+- Run `npm run dev -- --force` in the game project if Vite's dependency pre-bundling cache is stale after linking or rebuilding the engine
 - If `npm install` breaks the link, re-run `npm link bonkjs` in the game project
 - When done developing, `npm unlink bonkjs` and `npm install bonkjs` to switch back to the published version
 

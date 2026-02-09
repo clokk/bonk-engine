@@ -52,7 +52,7 @@ import {
   UIImage,
   UIText,
   UIButton,
-} from 'bonk-engine';
+} from 'bonkjs';
 
 // Create UI manager (pass your renderer)
 const ui = new UIManager(renderer);

@@ -7,7 +7,7 @@ Bonk Engine provides an EventEmitter utility for decoupled communication in your
 Create your own EventEmitter instances for custom events:
 
 ```typescript
-import { EventEmitter, GlobalEvents, EngineEvents } from 'bonk-engine';
+import { EventEmitter, GlobalEvents, EngineEvents } from 'bonkjs';
 
 const gameEvents = new EventEmitter();
 const uiEvents = new EventEmitter();
@@ -52,7 +52,7 @@ gameEvents.hasListeners('score');       // Check if anyone's listening
 `GlobalEvents` is a singleton for game-wide events:
 
 ```typescript
-import { GlobalEvents } from 'bonk-engine';
+import { GlobalEvents } from 'bonkjs';
 
 // In one part of your game
 GlobalEvents.emit('coin-collected', { value: 10 });
@@ -77,7 +77,7 @@ The engine emits these automatically via `GlobalEvents`:
 | `EngineEvents.TRIGGER_EXIT` | `{ bodyA, bodyB }` | Sensor overlap ended |
 
 ```typescript
-import { GlobalEvents, EngineEvents } from 'bonk-engine';
+import { GlobalEvents, EngineEvents } from 'bonkjs';
 
 GlobalEvents.on(EngineEvents.PAUSE, () => {
   console.log('Game paused');
@@ -150,7 +150,7 @@ enemyEvents.on('spawned', addToEnemyList);
 ## Example: Health System
 
 ```typescript
-import { EventEmitter } from 'bonk-engine';
+import { EventEmitter } from 'bonkjs';
 
 class HealthSystem {
   private events = new EventEmitter();
@@ -191,7 +191,7 @@ health.takeDamage(50);
 ## Example: Pub/Sub for Decoupled Systems
 
 ```typescript
-import { GlobalEvents } from 'bonk-engine';
+import { GlobalEvents } from 'bonkjs';
 
 // Publisher: doesn't know who's listening
 function killEnemy(enemyType: string, position: [number, number]) {

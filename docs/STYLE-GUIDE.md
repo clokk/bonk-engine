@@ -30,13 +30,30 @@ The editor uses Tailwind's **zinc** color scale as the foundation, providing a c
 | Secondary | `text-zinc-400` | `#a1a1aa` | Secondary text, labels |
 | Muted | `text-zinc-500` | `#71717a` | Placeholder text, disabled |
 
-### Accent Colors
+### Accent Colors (Themed)
+
+The primary accent color is driven by CSS custom properties and supports 3 switchable themes:
+
+| Theme | Accent | Glow | RGB |
+|-------|--------|------|-----|
+| **Amber** (default) | `#f59e0b` | `#fbbf24` | `245, 158, 11` |
+| **Lime** | `#84cc16` | `#a3e635` | `132, 204, 22` |
+| **Spring** | `#00e5a0` | `#34ffc6` | `0, 229, 160` |
+
+Use CSS custom properties instead of hardcoded hex values:
+
+```css
+color: var(--bonk-accent);                          /* solid accent */
+background: rgba(var(--bonk-accent-rgb), 0.1);      /* transparent tint */
+text-shadow: 0 0 20px rgba(var(--bonk-accent-rgb), 0.3); /* glow */
+```
+
+### Semantic Colors (Non-Themed)
 
 | Token | Tailwind Class | Hex | Usage |
 |-------|---------------|-----|-------|
-| Primary (Blue) | `text-sky-400` | `#38bdf8` | Primary actions, links, selection |
 | Success (Green) | `text-green-400` | `#4ade80` | Success states, play mode |
-| Warning (Yellow) | `text-yellow-400` | `#facc15` | Warnings, folders, code files |
+| Warning (Yellow) | `text-yellow-400` | `#facc15` | Warnings, folders, modified fields |
 | Error (Red) | `text-red-400` | `#f87171` | Errors, destructive actions, stop |
 
 ### Axis Colors (Transform Inspector)
@@ -54,9 +71,11 @@ The editor uses Tailwind's **zinc** color scale as the foundation, providing a c
 ### Font Families
 
 ```css
-font-family: 'Inter', sans-serif;     /* UI text */
-font-family: 'JetBrains Mono', monospace; /* Code, values, file names */
+font-family: var(--bonk-font-mono);  /* 'Recursive', 'Consolas', monospace — Code, values, file names */
+font-family: var(--bonk-font-ui);    /* 'Space Grotesk', sans-serif — UI text, subtitles */
 ```
+
+Fonts are loaded from Google Fonts via `@import` in the tweaker stylesheet. Falls back to Consolas/sans-serif if offline.
 
 ### Font Sizes
 
@@ -318,7 +337,7 @@ Custom webkit scrollbars:
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #38bdf8; /* sky-400 */
+  background: var(--bonk-accent);
 }
 ```
 
@@ -338,20 +357,63 @@ Custom webkit scrollbars:
 
 ## Animation
 
-Keep animations subtle and fast:
+Use spring-physics easing for interactive feedback. Two standard easing curves are defined as CSS custom properties:
 
-```tsx
-// Standard transition
-"transition-colors"
-
-// Duration (when needed)
-"duration-200"
+```css
+var(--bonk-ease-spring)  /* cubic-bezier(0.34, 1.56, 0.64, 1) — overshoot bounce */
+var(--bonk-ease-out)     /* cubic-bezier(0.16, 1, 0.3, 1)     — fast deceleration */
 ```
+
+Convenience shorthands:
+
+```css
+var(--bonk-transition-fast)    /* 0.15s var(--bonk-ease-out)    — hover, color changes */
+var(--bonk-transition-bounce)  /* 0.25s var(--bonk-ease-spring) — focus rings, button press */
+```
+
+Usage guidelines:
+
+- **Hover states** (bg/color): use `var(--bonk-transition-fast)`
+- **Focus states** (border pop): use `var(--bonk-transition-bounce)` for spring overshoot
+- **Button press**: add `transform var(--bonk-transition-bounce)` + `:active { transform: scale(0.96) }`
+- **Group headers**: `:active { transform: scale(0.995) translateX(1px) }` for subtle press feel
 
 Avoid:
 - CRT effects (scanlines, flicker)
 - Offset shadows
 - Excessive motion
+
+---
+
+## Theming
+
+The tweaker supports 3 color themes (amber, lime, spring green) controlled via CSS custom properties on `.bonk-tweaker`. Theme selection is persisted to `localStorage('bonk-tweaker-theme')`.
+
+### CSS Custom Properties
+
+All theme-dependent values are defined as CSS custom properties on `.bonk-tweaker`:
+
+| Property | Purpose | Example |
+|----------|---------|---------|
+| `--bonk-accent` | Solid accent color | `color: var(--bonk-accent)` |
+| `--bonk-accent-rgb` | RGB triplet for `rgba()` | `rgba(var(--bonk-accent-rgb), 0.1)` |
+| `--bonk-accent-glow` | Brighter variant for glow effects | `text-shadow: 0 0 20px var(--bonk-accent-glow)` |
+| `--bonk-font-mono` | Monospace font stack | `font-family: var(--bonk-font-mono)` |
+| `--bonk-font-ui` | UI font stack | `font-family: var(--bonk-font-ui)` |
+| `--bonk-ease-spring` | Spring overshoot curve | `transition: ... var(--bonk-ease-spring)` |
+| `--bonk-ease-out` | Fast deceleration curve | `transition: ... var(--bonk-ease-out)` |
+| `--bonk-transition-fast` | Quick hover transition | `transition: color var(--bonk-transition-fast)` |
+| `--bonk-transition-bounce` | Bouncy focus transition | `transition: border var(--bonk-transition-bounce)` |
+
+### Adding a New Theme
+
+1. Add the theme name to `TweakerTheme` in `src/devtools/types.ts`
+2. Add a `.bonk-tweaker.theme-<name>` block in `tweaker-styles.ts` with `--bonk-accent`, `--bonk-accent-rgb`, `--bonk-accent-glow`
+3. Add an entry to the `themes` array in `TweakerOverlay.create()` with the swatch color
+
+### Precedence
+
+`config.theme` sets the initial theme on first init. `localStorage` overrides on subsequent loads. Swatch clicks override both and persist.
 
 ---
 

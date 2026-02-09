@@ -2,7 +2,7 @@
 
 **Status: COMPLETED** (February 2026)
 
-Refactored bonk-engine from a scene-based game engine (GameObject/Component/Behavior + JSON scenes) into a runtime library with importable modules and no forced architecture.
+Refactored bonkjs from a scene-based game engine (GameObject/Component/Behavior + JSON scenes) into a runtime library with importable modules and no forced architecture.
 
 ---
 
@@ -25,7 +25,7 @@ src/
 ### Target API
 
 ```typescript
-import { Game, Sprite, Camera, RigidBody, Input, Time, Transform } from 'bonk-engine';
+import { Game, Sprite, Camera, RigidBody, Input, Time, Transform } from 'bonkjs';
 
 const game = new Game({ physics: { gravity: [0, 980] } });
 const canvas = await game.init({ width: 800, height: 600 });
@@ -102,7 +102,7 @@ Implemented as part of Phase 1:
 - Deleted legacy docs (SCENES-AND-PREFABS.md, EDITOR-MVP.md, EDITOR-STYLE-GUIDE.md)
 - Rewrote all capability docs to use new API (PHYSICS, INPUT, TIME, EVENTS, CAMERA, AUDIO-SYSTEM, ANIMATED-SPRITES)
 - Updated ARCHITECTURE.md, README.md, CLAUDE.md, VISION.md, UI-SYSTEM.md
-- Updated `claudeverse/projects/bonk-engine.md` roadmap
+- Updated `claudeverse/projects/bonkjs.md` roadmap
 
 ---
 

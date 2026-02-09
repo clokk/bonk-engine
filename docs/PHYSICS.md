@@ -7,7 +7,7 @@ Bonk Engine uses Matter.js for 2D physics simulation.
 Physics bodies are created through the Game instance and managed directly in TypeScript:
 
 ```typescript
-import { Game, RigidBody, Transform, CollisionLayers } from 'bonk-engine';
+import { Game, RigidBody, Transform, CollisionLayers } from 'bonkjs';
 
 const game = new Game({ width: 800, height: 600 });
 
@@ -189,7 +189,7 @@ Collision layers control which objects can collide with each other using bitmask
 Configure layers directly on colliders:
 
 ```typescript
-import { CollisionLayers } from 'bonk-engine';
+import { CollisionLayers } from 'bonkjs';
 
 // Player collides with everything
 const player = game.createBody(playerTransform, { bodyType: 'dynamic' });
@@ -235,7 +235,7 @@ bullet.addCollider({
 ### Runtime API
 
 ```typescript
-import { CollisionLayers } from 'bonk-engine';
+import { CollisionLayers } from 'bonkjs';
 
 // Pre-register layers (optional - auto-registers on first use)
 CollisionLayers.register('player');
@@ -285,7 +285,7 @@ bodies.forEach(body => {
 ## Complete Example
 
 ```typescript
-import { Game, Transform, CollisionLayers } from 'bonk-engine';
+import { Game, Transform, CollisionLayers } from 'bonkjs';
 
 const game = new Game({
   width: 800,
