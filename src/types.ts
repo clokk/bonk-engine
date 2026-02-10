@@ -43,23 +43,3 @@ export interface InputConfig {
   buttons: Record<string, ButtonConfig>;
 }
 
-// === Transform Types ===
-
-/** Transform data for positioning */
-export interface TransformJson {
-  position: Vector2;
-  rotation: number;
-  scale: Vector2;
-  zIndex?: number;
-}
-
-// === Physics Types ===
-
-/** Physics body types */
-export type BodyType = 'dynamic' | 'static' | 'kinematic';
-
-/** Collider shapes */
-export type ColliderShape =
-  | { type: 'box'; width: number; height: number }
-  | { type: 'circle'; radius: number }
-  | { type: 'polygon'; vertices: Vector2[] };

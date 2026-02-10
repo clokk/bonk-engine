@@ -1,17 +1,22 @@
 # Camera System
 
-Bonk Engine provides a Camera class for viewport control with smooth following, zoom, bounds, and deadzone support.
+bonkjs provides a Camera class for viewport control with smooth following, zoom, bounds, and deadzone support. The camera operates directly on a PixiJS Container.
 
 ## Basic Usage
 
-Import and create a Camera:
-
 ```typescript
-import { Camera, Game } from 'bonkjs';
+import { Game, Camera } from 'bonkjs';
 
-const game = new Game({ width: 800, height: 600 });
-const camera = new Camera(game.renderer, { followSmoothing: 8 });
+const game = new Game();
+const { world } = await game.init({ width: 1920, height: 1080 });
+
+const camera = new Camera(world, {
+  viewport: { width: 1920, height: 1080 },
+  followSmoothing: 8,
+});
 ```
+
+The first argument is the PixiJS Container the camera controls (typically the `world` container from `Game.init()`). The `viewport` config tells the camera the logical viewport dimensions for bounds clamping.
 
 ## Properties
 
@@ -28,17 +33,13 @@ const camera = new Camera(game.renderer, { followSmoothing: 8 });
 The camera smoothly follows a target using a function that returns the target's position:
 
 ```typescript
-import { Camera, Game, Transform } from 'bonkjs';
+const camera = new Camera(world, {
+  viewport: { width: 1920, height: 1080 },
+  followSmoothing: 10,
+});
 
-const game = new Game({ width: 800, height: 600 });
-const camera = new Camera(game.renderer, { followSmoothing: 10 });
-
-// Create a player transform
-const player = new Transform();
-player.position = [100, 100];
-
-// Follow the player - pass a function that returns [x, y]
-camera.follow(() => player.worldPosition);
+// Follow the player — pass a function that returns [x, y]
+camera.follow(() => [player.x, player.y]);
 
 // Optional: add offset to show more ahead of player
 camera.offset = [0, -50];
@@ -66,12 +67,15 @@ camera.zoom = 0.5;
 Constrain the camera to world limits:
 
 ```typescript
-camera.bounds = {
-  minX: 0,
-  minY: 0,
-  maxX: 1600,
-  maxY: 900
-};
+const camera = new Camera(world, {
+  viewport: { width: 1920, height: 1080 },
+  bounds: {
+    minX: 0,
+    minY: 0,
+    maxX: 2560,
+    maxY: 1440,
+  },
+});
 ```
 
 The camera will stop scrolling when it reaches the edge of bounds, preventing the viewport from showing empty space outside your level.
@@ -83,7 +87,7 @@ Allow the target to move within a zone before camera follows:
 ```typescript
 camera.deadzone = {
   width: 100,
-  height: 50
+  height: 50,
 };
 ```
 
@@ -103,50 +107,47 @@ Useful for level transitions or respawning.
 ## Complete Example
 
 ```typescript
-import { Camera, Game, Transform } from 'bonkjs';
+import { Game, Camera } from 'bonkjs';
 
-const game = new Game({ width: 800, height: 600 });
+const game = new Game();
+const { world } = await game.init({ width: 1920, height: 1080 });
 
-// Create player
-const player = new Transform();
-player.position = [400, 300];
+// Player position (your game manages this however it wants)
+const player = { x: 400, y: 300 };
 
 // Create camera with smooth following
-const camera = new Camera(game.renderer, {
-  followSmoothing: 8
+const camera = new Camera(world, {
+  viewport: { width: 1920, height: 1080 },
+  zoom: 0.75,
+  followSmoothing: 8,
+  bounds: {
+    minX: 0,
+    minY: 0,
+    maxX: 2560,
+    maxY: 1440,
+  },
 });
 
-// Configure camera
-camera.follow(() => player.worldPosition);
-camera.offset = [0, -30]; // Show more ahead
-camera.zoom = 1;
-camera.bounds = {
-  minX: 0,
-  minY: 0,
-  maxX: 1600,
-  maxY: 900
-};
-camera.deadzone = {
-  width: 80,
-  height: 40
-};
+// Follow the player
+camera.follow(() => [player.x, player.y]);
+camera.offset = [0, -30];
+camera.deadzone = { width: 80, height: 40 };
 
-// Update camera every frame
+// Update camera every frame (after positions are final)
 game.onLateUpdate(() => {
   camera.update();
 });
 
 // Change target dynamically
-const boss = new Transform();
-boss.position = [1200, 600];
+const boss = { x: 1200, y: 600 };
 
 // Switch to boss during cutscene
-camera.follow(() => boss.worldPosition);
+camera.follow(() => [boss.x, boss.y]);
 camera.followSmoothing = 3; // Slower for cinematic effect
 
 // Later: snap back to player
-camera.snapTo(player.position[0], player.position[1]);
-camera.follow(() => player.worldPosition);
+camera.snapTo(player.x, player.y);
+camera.follow(() => [player.x, player.y]);
 camera.followSmoothing = 8;
 ```
 
@@ -173,7 +174,18 @@ camera.followSmoothing = 8;
 
 ## How It Works
 
-The Camera class must be updated in `lateUpdate()` to ensure it moves after all physics and movement updates. It transforms the PixiJS `worldContainer`, not individual sprites, which is efficient for large scenes.
+The Camera class must be updated in `lateUpdate()` to ensure it moves after all physics and movement updates. It transforms the PixiJS world Container directly by setting `scale` and `position`:
+
+```typescript
+// Every frame in camera.update():
+container.scale.set(zoom, zoom);
+container.position.set(
+  viewportWidth / 2 - cameraX * zoom,
+  viewportHeight / 2 - cameraY * zoom,
+);
+```
+
+This moves the entire world container rather than individual sprites, which is efficient for large scenes.
 
 The camera calculates its position by:
 
@@ -182,4 +194,4 @@ The camera calculates its position by:
 3. Applying deadzone logic (if configured)
 4. Smoothly interpolating to new position using `followSmoothing`
 5. Clamping to bounds (if configured)
-6. Applying position and zoom to the renderer's world container
+6. Applying position and zoom to the container

@@ -1,30 +1,21 @@
 /**
- * Bonk Engine — Public API
+ * bonkjs — PixiJS game toolkit
  */
 
 // Types
-export * from './types';
+export type { Vector2, Vector3, Color, HexColor, ColorValue, AxisConfig, ButtonConfig, InputConfig } from './types';
 
-// Runtime
-export * from './runtime';
-
-// Rendering
-export * from './render';
-
-// Physics
-export * from './physics';
+// Core
+export { Game, type GameInitConfig, type GameInitResult } from './Game';
+export { Time } from './Time';
+export { Camera, type CameraConfig } from './Camera';
 
 // Input
-export * from './input';
-
-// Audio
-export * from './audio';
+export { Input } from './Input';
+export { Keys } from './Keys';
 
 // Math
-export * from './math';
-
-// UI
-export * from './ui';
+export { vec2 } from './vec2';
 
 // Dev Tools
-export * from './devtools';
+export { Tweaker, type TweakerConfig, type RegisterOptions, type FieldHint, type TweakerTheme } from './devtools';

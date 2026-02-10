@@ -1,107 +1,50 @@
-# Event System
+# Event Patterns
 
-Bonk Engine provides an EventEmitter utility for decoupled communication in your game. The engine itself is event-agnostic — you manage your own event architecture.
+bonkjs is a toolkit, not a framework — it doesn't ship an event system. Your game manages its own event architecture using whatever pattern fits.
 
-## EventEmitter
+This doc covers common event patterns for games built with bonkjs.
 
-Create your own EventEmitter instances for custom events:
+## Simple EventEmitter
 
-```typescript
-import { EventEmitter, GlobalEvents, EngineEvents } from 'bonkjs';
-
-const gameEvents = new EventEmitter();
-const uiEvents = new EventEmitter();
-```
-
-### Subscribe
+A minimal pub/sub implementation fits in ~30 lines and works for most games:
 
 ```typescript
-// Subscribe (returns unsubscribe function)
-const unsub = gameEvents.on('playerDied', (data) => {
-  console.log('Player died at', data.position);
-});
+type Listener<T = any> = (data: T) => void;
 
-// One-time listener
-gameEvents.once('levelComplete', () => {
-  loadNextLevel();
-});
+class EventEmitter {
+  private listeners = new Map<string, Set<Listener>>();
 
-// Unsubscribe
-unsub();
-// or
-gameEvents.off('playerDied', callback);
-```
+  on<T>(event: string, callback: Listener<T>): () => void {
+    if (!this.listeners.has(event)) this.listeners.set(event, new Set());
+    this.listeners.get(event)!.add(callback);
+    return () => this.listeners.get(event)?.delete(callback);
+  }
 
-### Emit
+  emit<T>(event: string, data?: T): void {
+    this.listeners.get(event)?.forEach(cb => cb(data));
+  }
 
-```typescript
-gameEvents.emit('playerDied', { position: [100, 200] });
-gameEvents.emit('scoreChanged', { score: 500 });
-```
-
-### Cleanup
-
-```typescript
-gameEvents.removeAllListeners();        // Remove all
-gameEvents.removeAllListeners('score'); // Remove all for one event
-gameEvents.hasListeners('score');       // Check if anyone's listening
-```
-
-## Global Events
-
-`GlobalEvents` is a singleton for game-wide events:
-
-```typescript
-import { GlobalEvents } from 'bonkjs';
-
-// In one part of your game
-GlobalEvents.emit('coin-collected', { value: 10 });
-
-// In another part
-GlobalEvents.on('coin-collected', ({ value }) => {
-  updateScore(value);
-});
-```
-
-## Built-in Engine Events
-
-The engine emits these automatically via `GlobalEvents`:
-
-| Event | Data | When |
-|-------|------|------|
-| `EngineEvents.PAUSE` | | Game paused |
-| `EngineEvents.RESUME` | | Game resumed |
-| `EngineEvents.COLLISION_ENTER` | `{ bodyA, bodyB }` | Physical collision starts (non-sensor bodies) |
-| `EngineEvents.COLLISION_EXIT` | `{ bodyA, bodyB }` | Physical collision ends (non-sensor bodies) |
-| `EngineEvents.TRIGGER_ENTER` | `{ bodyA, bodyB }` | Sensor overlap detected (`isTrigger: true` on either body) |
-| `EngineEvents.TRIGGER_EXIT` | `{ bodyA, bodyB }` | Sensor overlap ended |
-
-```typescript
-import { GlobalEvents, EngineEvents } from 'bonkjs';
-
-GlobalEvents.on(EngineEvents.PAUSE, () => {
-  console.log('Game paused');
-});
-
-GlobalEvents.on(EngineEvents.COLLISION_ENTER, ({ bodyA, bodyB }) => {
-  handleCollision(bodyA, bodyB);
-});
+  removeAll(event?: string): void {
+    if (event) this.listeners.delete(event);
+    else this.listeners.clear();
+  }
+}
 ```
 
 ## Event Architecture Patterns
 
-How you structure events is up to you. Here are common patterns:
-
 ### Single Global Bus
 
-Use `GlobalEvents` for everything:
+One emitter for everything. Simple, good for small games:
 
 ```typescript
+const events = new EventEmitter();
+
 // Anywhere in your game
-GlobalEvents.emit('enemy-killed', { type: 'boss', position: [100, 200] });
+events.emit('enemy-killed', { type: 'boss', position: [100, 200] });
 
 // Multiple systems react
-GlobalEvents.on('enemy-killed', (data) => {
+events.on('enemy-killed', (data) => {
   updateScore(data.type);
   spawnParticles(data.position);
   checkQuestProgress(data.type);
@@ -113,7 +56,7 @@ GlobalEvents.on('enemy-killed', (data) => {
 
 ### Domain-Specific Emitters
 
-Create separate EventEmitters for different game systems:
+Separate emitters for different game systems:
 
 ```typescript
 const combatEvents = new EventEmitter();
@@ -128,33 +71,34 @@ questEvents.on('objective-complete', showNotification);
 **Pros:** Better organization, easier to debug
 **Cons:** Need to pass emitters to code that needs them
 
-### Hybrid Approach
+### Direct Callbacks (No Events)
 
-Use `GlobalEvents` for engine-level concerns and custom emitters for gameplay:
+For many games, you don't need events at all. Direct function calls or callback registrations work fine:
 
 ```typescript
-// Engine-level: pause/resume, collisions
-GlobalEvents.on(EngineEvents.PAUSE, handlePause);
+// Instead of events, just call functions directly
+function killEnemy(enemy: Enemy) {
+  score += enemy.points;
+  spawnExplosion(enemy.x, enemy.y);
+  enemies.splice(enemies.indexOf(enemy), 1);
+}
 
-// Gameplay-level: custom emitters
-const playerEvents = new EventEmitter();
-const enemyEvents = new EventEmitter();
+// Or use callback arrays for decoupling
+const onPlayerDied: Array<() => void> = [];
+onPlayerDied.push(() => showDeathScreen());
+onPlayerDied.push(() => playDeathSound());
 
-playerEvents.on('level-up', showLevelUpEffect);
-enemyEvents.on('spawned', addToEnemyList);
+function playerDied() {
+  onPlayerDied.forEach(cb => cb());
+}
 ```
-
-**Pros:** Clear separation of concerns
-**Cons:** More boilerplate
 
 ## Example: Health System
 
 ```typescript
-import { EventEmitter } from 'bonkjs';
-
 class HealthSystem {
   private events = new EventEmitter();
-  private hp: number = 100;
+  private hp = 100;
 
   takeDamage(amount: number): void {
     this.hp -= amount;
@@ -188,64 +132,16 @@ health.onDied(() => {
 health.takeDamage(50);
 ```
 
-## Example: Pub/Sub for Decoupled Systems
-
-```typescript
-import { GlobalEvents } from 'bonkjs';
-
-// Publisher: doesn't know who's listening
-function killEnemy(enemyType: string, position: [number, number]) {
-  GlobalEvents.emit('enemy-killed', { type: enemyType, position });
-}
-
-// Subscribers: independent systems react
-class ScoreManager {
-  constructor() {
-    GlobalEvents.on('enemy-killed', ({ type }) => {
-      this.addScore(type === 'boss' ? 1000 : 100);
-    });
-  }
-
-  addScore(points: number) {
-    // Update score
-  }
-}
-
-class ParticleSpawner {
-  constructor() {
-    GlobalEvents.on('enemy-killed', ({ position }) => {
-      this.spawnExplosion(position);
-    });
-  }
-
-  spawnExplosion(position: [number, number]) {
-    // Spawn particles
-  }
-}
-
-class QuestTracker {
-  constructor() {
-    GlobalEvents.on('enemy-killed', ({ type }) => {
-      this.checkQuest('kill-enemies', type);
-    });
-  }
-
-  checkQuest(questId: string, enemyType: string) {
-    // Update quest progress
-  }
-}
-```
-
 ## Best Practices
 
 1. **Clean up listeners** when systems are destroyed to avoid memory leaks:
    ```typescript
-   class Game {
+   class GameScreen {
      private unsubs: Array<() => void> = [];
 
      init() {
        this.unsubs.push(
-         GlobalEvents.on('game-over', this.handleGameOver)
+         events.on('game-over', this.handleGameOver)
        );
      }
 
@@ -263,36 +159,13 @@ class QuestTracker {
      'level-complete': void;
    };
 
+   // Typed emitter prevents typos and wrong data shapes
    const gameEvents = new EventEmitter<GameEvents>();
-
-   // TypeScript will enforce correct event names and data types
    gameEvents.emit('player-died', { position: [100, 200] });
    ```
 
-3. **Avoid event spam**: Debounce or throttle high-frequency events:
-   ```typescript
-   let scoreUpdateQueued = false;
+3. **Avoid event spam**: Debounce or throttle high-frequency events.
 
-   function updateScore(delta: number) {
-     score += delta;
+4. **Document your event contracts**: Make it clear what events exist and what data they carry.
 
-     if (!scoreUpdateQueued) {
-       scoreUpdateQueued = true;
-       requestAnimationFrame(() => {
-         gameEvents.emit('score-changed', { score });
-         scoreUpdateQueued = false;
-       });
-     }
-   }
-   ```
-
-4. **Document your event contracts**: Make it clear what events exist and what data they carry:
-   ```typescript
-   /**
-    * Game Events:
-    * - 'player-died': { position: [x, y] } - Emitted when player health reaches 0
-    * - 'coin-collected': { value: number } - Emitted when player picks up a coin
-    * - 'level-complete': void - Emitted when all objectives are met
-    */
-   export const gameEvents = new EventEmitter();
-   ```
+5. **Consider whether you need events at all.** For small games with 2-3 systems, direct function calls are simpler and easier to trace. Events shine when you need decoupling between systems that shouldn't know about each other.

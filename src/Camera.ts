@@ -1,13 +1,15 @@
 /**
- * Camera - Standalone 2D camera, decoupled from any entity system.
+ * Camera - Standalone 2D camera operating directly on a PixiJS Container.
  */
 
-import type { Renderer } from './Renderer';
-import { Time } from '../runtime/Time';
-import type { Vector2 } from '../types';
+import type { Container } from 'pixi.js';
+import { Time } from './Time';
+import type { Vector2 } from './types';
 
 /** Camera configuration */
 export interface CameraConfig {
+  /** Viewport size (needed for bounds clamping) */
+  viewport: { width: number; height: number };
   /** Zoom level (1 = 100%) */
   zoom?: number;
   /** Follow speed (higher = tighter follow) */
@@ -36,7 +38,9 @@ export class Camera {
   /** Deadzone */
   deadzone?: { width: number; height: number };
 
-  private renderer: Renderer;
+  private container: Container;
+  private viewportWidth: number;
+  private viewportHeight: number;
   private targetFn: (() => Vector2) | null = null;
   private currentPosition: Vector2 = [0, 0];
 
@@ -46,13 +50,15 @@ export class Camera {
   private shakeElapsed = 0;
   private shakeDecay = 0.9;
 
-  constructor(renderer: Renderer, config?: CameraConfig) {
-    this.renderer = renderer;
-    this.zoom = config?.zoom ?? 1;
-    this.followSmoothing = config?.followSmoothing ?? 5;
-    this.offset = config?.offset ? [...config.offset] : [0, 0];
-    if (config?.bounds) this.bounds = { ...config.bounds };
-    if (config?.deadzone) this.deadzone = { ...config.deadzone };
+  constructor(worldContainer: Container, config: CameraConfig) {
+    this.container = worldContainer;
+    this.viewportWidth = config.viewport.width;
+    this.viewportHeight = config.viewport.height;
+    this.zoom = config.zoom ?? 1;
+    this.followSmoothing = config.followSmoothing ?? 5;
+    this.offset = config.offset ? [...config.offset] : [0, 0];
+    if (config.bounds) this.bounds = { ...config.bounds };
+    if (config.deadzone) this.deadzone = { ...config.deadzone };
   }
 
   /**
@@ -116,15 +122,22 @@ export class Camera {
       }
     }
 
-    this.renderer.setCameraPosition(renderX, renderY);
-    this.renderer.setCameraZoom(this.zoom);
+    // Apply transform directly to PixiJS container
+    this.container.scale.set(this.zoom, this.zoom);
+    this.container.position.set(
+      this.viewportWidth / 2 - renderX * this.zoom,
+      this.viewportHeight / 2 - renderY * this.zoom,
+    );
   }
 
   /** Instantly move camera to position (no smoothing). */
   snapTo(x: number, y: number): void {
     this.currentPosition = [x, y];
-    this.renderer.setCameraPosition(x, y);
-    this.renderer.setCameraZoom(this.zoom);
+    this.container.scale.set(this.zoom, this.zoom);
+    this.container.position.set(
+      this.viewportWidth / 2 - x * this.zoom,
+      this.viewportHeight / 2 - y * this.zoom,
+    );
   }
 
   /** Get current camera position. */
@@ -169,9 +182,8 @@ export class Camera {
 
   private clampToBounds(pos: Vector2): Vector2 {
     const b = this.bounds!;
-    const viewport = this.renderer.getViewportSize();
-    const halfW = (viewport.width / 2) / this.zoom;
-    const halfH = (viewport.height / 2) / this.zoom;
+    const halfW = (this.viewportWidth / 2) / this.zoom;
+    const halfH = (this.viewportHeight / 2) / this.zoom;
 
     return [
       Math.max(b.minX + halfW, Math.min(b.maxX - halfW, pos[0])),

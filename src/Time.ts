@@ -30,9 +30,8 @@ export class Time {
 
   private static fpsAccumulator: number = 0;
   private static fpsFrameCount: number = 0;
-  private static lastFpsUpdate: number = 0;
 
-  /** Update time values (called by WorldManager) */
+  /** Update time values (called by Game loop) */
   static update(dt: number): void {
     this.unscaledDeltaTime = dt;
     this.deltaTime = dt * this.timeScale;

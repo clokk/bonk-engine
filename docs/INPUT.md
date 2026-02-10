@@ -1,6 +1,6 @@
 # Input System
 
-Bonk Engine provides a Unity-familiar input system with named axes and buttons, plus raw keyboard and mouse access.
+bonkjs provides a Unity-familiar input system with named axes and buttons, plus raw keyboard and mouse access.
 
 ## Axes
 
@@ -107,28 +107,31 @@ if (Input.getMouseButtonDown(2)) { ... }     // right-click this frame
 
 ## Using Input in Game Code
 
-All input methods are static on the `Input` class:
+All input methods are static on the `Input` class. Your game uses them however it wants — bonkjs doesn't impose any entity or component system:
 
 ```typescript
-import { Input, Runtime } from 'bonkjs';
+import { Input, Keys } from 'bonkjs';
 
-class PlayerController {
-  speed: number = 200;
-  jumpForce: number = 400;
-  entityId: string;
+// Simple approach: read input directly where you need it
+function updatePlayer(player: Player, dt: number) {
+  const dx = Input.getAxisRaw('horizontal') * player.speed * dt;
+  player.x += dx;
 
-  constructor(entityId: string) {
-    this.entityId = entityId;
+  if (Input.getButtonDown('jump') && player.grounded) {
+    player.vy = -player.jumpForce;
   }
+}
 
-  update(dt: number): void {
-    // Movement
-    const dx = Input.getAxisRaw('horizontal') * this.speed * dt;
-    Runtime.transform.translate(this.entityId, dx, 0);
+// Class approach: same idea, different structure
+class PlayerController {
+  speed = 200;
+  jumpForce = 400;
 
-    // Jump
+  update(player: Player, dt: number): void {
+    player.x += Input.getAxisRaw('horizontal') * this.speed * dt;
+
     if (Input.getButtonDown('jump')) {
-      Runtime.rigidbody.applyImpulse(this.entityId, [0, -this.jumpForce]);
+      player.vy = -this.jumpForce;
     }
   }
 }
@@ -157,4 +160,4 @@ Input.setConfig({
 - `getAxisRaw()` reflects the current key state
 - `getAxis()` smoothly interpolates toward the target value
 
-The engine handles this automatically -- you don't need to call `Input.update()` yourself.
+The game loop handles this automatically — you don't need to call `Input.update()` yourself.

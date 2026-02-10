@@ -1,10 +1,10 @@
 /**
- * Input system for Bonk Engine.
+ * Input system for bonkjs.
  * Unity-style input handling with axes, buttons, and raw key access.
  */
 
-import type { Vector2, AxisConfig, ButtonConfig, InputConfig } from '../types';
-import { Time } from '../runtime/Time';
+import type { Vector2, AxisConfig, ButtonConfig, InputConfig } from './types';
+import { Time } from './Time';
 
 /** Default input configuration */
 const DEFAULT_CONFIG: InputConfig = {
@@ -148,7 +148,7 @@ export class Input {
 
   /**
    * Update input state.
-   * Call at the start of each frame, after Time.update().
+   * Call at the end of each frame.
    */
   static update(): void {
     // Clear per-frame state from previous frame

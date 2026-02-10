@@ -1,7 +1,7 @@
 {
   "name": "bonkjs",
-  "version": "0.2.0",
-  "description": "2D game engine runtime library — importable modules, no forced architecture",
+  "version": "0.3.0",
+  "description": "PixiJS game toolkit — game loop, input, camera, vec2, devtools",
   "type": "module",
   "main": "./dist/bonkjs.js",
   "module": "./dist/bonkjs.js",
@@ -13,11 +13,7 @@
     }
   },
   "files": [
-    "dist",
-    "!dist/**/*.mp3",
-    "!dist/**/*.png",
-    "!dist/**/*.wav",
-    "!dist/**/*.ogg"
+    "dist"
   ],
   "sideEffects": false,
   "scripts": {
@@ -27,27 +23,21 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit"
   },
-  "dependencies": {
-    "howler": "^2.2.4",
-    "matter-js": "^0.19.0",
+  "peerDependencies": {
     "pixi.js": "^8.6.6"
   },
   "devDependencies": {
-    "@types/howler": "^2.2.12",
-    "@types/matter-js": "^0.19.7",
     "@types/node": "^22.10.7",
-    "pixi-filters": "^6.1.5",
     "typescript": "^5.7.3",
     "vite": "^6.0.7",
     "vite-plugin-dts": "^4.5.4"
   },
   "keywords": [
-    "game-engine",
+    "game-toolkit",
     "2d",
     "typescript",
     "pixi",
-    "matter-js",
-    "runtime-library"
+    "game-loop"
   ],
   "author": "Connor Leisz",
   "license": "MIT"

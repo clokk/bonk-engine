@@ -1,209 +1,143 @@
-# Bonk Engine Architecture
+# bonkjs Architecture
 
 ## Overview
 
-Bonk Engine is a 2D game toolkit that sandwiches the game in three layers:
+bonkjs is a lean PixiJS game toolkit. It provides the game loop, input, camera, math, and devtools that every 2D game needs — nothing more.
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  Layer 3: Bonk Overlay (game-agnostic dev tools)        │
-│  Debug wireframes, performance overlays, state          │
-│  inspection, build targets, hot reload                  │
+│  Layer 3: Dev Tools (optional, dev-only)                 │
+│  Tweaker overlay for live-tuning constants               │
 ├─────────────────────────────────────────────────────────┤
-│  Layer 2: Game Code (Claude-authored, game-specific)    │
-│  Whatever architecture THIS game needs — turn systems,  │
-│  terrain, inventory, AI, state machines, ECS, nothing   │
+│  Layer 2: Game Code (your code, game-specific)           │
+│  Whatever architecture THIS game needs                   │
 ├─────────────────────────────────────────────────────────┤
-│  Layer 1: Bonk Runtime (game-agnostic tools)            │
-│  Rendering, physics, input, audio, math, camera, UI     │
+│  Layer 1: bonkjs (game-agnostic toolkit)                 │
+│  Game loop, input, camera, math                          │
 └─────────────────────────────────────────────────────────┘
 ```
 
-Layers 1 and 3 are game-agnostic — built once, reused across every game. Layer 2 is where Claude has total creative freedom. This document covers Layers 1 and 3 in detail.
-
-## Layer 1: Module Structure
-
-```
-@bonk/runtime     Game loop, time, lifecycle
-@bonk/render      PixiJS: sprites, animated sprites, text, cameras
-@bonk/physics     Matter.js rigid body + Verlet kinematic (planned)
-@bonk/input       Keyboard, mouse, touch, gamepad
-@bonk/audio       Howler.js: music, SFX, spatial audio
-@bonk/math        vec2 utilities, common game math
-```
+## Modules
 
 A game imports what it needs:
 
 ```typescript
-import { Game } from '@bonk/runtime';
-import { Sprite, Camera } from '@bonk/render';
-import { RigidBody, Collider } from '@bonk/physics';
-import { Input } from '@bonk/input';
-import { vec2 } from '@bonk/math';
+import { Game, Camera, Time, Input, Keys, vec2, Tweaker } from 'bonkjs';
 ```
+
+| Module | File | Dependency | Purpose |
+|--------|------|------------|---------|
+| Game | `Game.ts` | Time, Input, pixi.js | PixiJS bootstrap + game loop |
+| Time | `Time.ts` | none | Delta time, elapsed time, time scaling |
+| Camera | `Camera.ts` | Time, pixi.js | 2D camera on a PixiJS Container |
+| Input | `Input.ts` | Time | Keyboard, mouse, axes, buttons |
+| Keys | `Keys.ts` | none | Typed KeyboardEvent.code constants |
+| vec2 | `vec2.ts` | none | Functional vector math |
+| Tweaker | `devtools/` | none | Runtime constant editor |
 
 ## Game Loop
 
-The `Game` class owns the core loop: fixed timestep for physics, variable timestep for rendering.
+The `Game` class creates a PixiJS Application and runs a dual-timestep loop:
+
+```
+┌─────────────────────────────────────────┐
+│  requestAnimationFrame                   │
+│                                          │
+│  1. Time.update(dt)                      │
+│                                          │
+│  2. Fixed timestep (accumulator)         │
+│     while (acc >= 1/60):                 │
+│       onFixedUpdate callbacks            │
+│       acc -= 1/60                        │
+│                                          │
+│  3. onUpdate callbacks                   │
+│                                          │
+│  4. onLateUpdate callbacks               │
+│                                          │
+│  5. Input.update() (clear per-frame)     │
+│                                          │
+│  PixiJS renders automatically via ticker │
+└─────────────────────────────────────────┘
+```
+
+- **Fixed update** (60Hz) — Deterministic gameplay. Same result regardless of display refresh rate. Use for physics, game state, AI.
+- **Variable update** (native Hz) — Visuals at whatever the display supports. Use for rendering, particles, UI, interpolation.
+- **Late update** — Runs after variable update. Use for camera follow (needs final positions).
+- **PixiJS rendering** — Handled automatically by PixiJS Application's internal ticker. No manual `render()` call needed.
+
+### Initialization
+
+`Game.init()` creates the PixiJS Application and returns raw objects:
 
 ```typescript
-function gameLoop() {
-  const dt = calculateDeltaTime();
-  Time.update(dt);
-
-  // Fixed timestep for physics (accumulator pattern)
-  accumulator += dt;
-  while (accumulator >= fixedTimestep) {
-    game.fixedUpdate();   // Physics, deterministic logic
-    accumulator -= fixedTimestep;
-  }
-
-  // Variable timestep
-  game.update();          // Game logic
-  game.lateUpdate();      // Camera follow, post-processing
-
-  // Render
-  renderer.render();
-
-  requestAnimationFrame(gameLoop);
-}
+const game = new Game();
+const { canvas, app, world, ui } = await game.init({
+  width: 1920,
+  height: 1080,
+  backgroundColor: 0x0a0a15,
+  preference: 'webgl',
+});
 ```
 
-Games register callbacks:
+- `canvas` — The `<canvas>` element to append to the DOM
+- `app` — The raw PixiJS `Application` instance
+- `world` — A PixiJS `Container` (sortableChildren enabled) for game-world objects. Camera operates on this.
+- `ui` — A PixiJS `Container` (sortableChildren enabled) for screen-space UI. Not affected by camera.
+
+## Camera
+
+Camera operates directly on a PixiJS Container by setting `scale` and `position`:
 
 ```typescript
-const game = new Game({ width: 800, height: 600 });
+// Camera.update() applies this every frame:
+container.scale.set(zoom, zoom);
+container.position.set(
+  viewportWidth / 2 - cameraX * zoom,
+  viewportHeight / 2 - cameraY * zoom,
+);
+```
 
-game.onFixedUpdate(() => {
-  // Physics-rate logic (60Hz)
+The camera needs `viewport` dimensions in its config for bounds clamping:
+
+```typescript
+const camera = new Camera(worldContainer, {
+  viewport: { width: 1920, height: 1080 },
+  zoom: 0.75,
+  followSmoothing: 5,
+  bounds: { minX: 0, minY: 0, maxX: worldWidth, maxY: worldHeight },
 });
-
-game.onUpdate((dt) => {
-  // Per-frame logic
-});
-
-game.onLateUpdate(() => {
-  // Post-update (camera, etc.)
-});
-
-game.start();
 ```
-
-## Rendering
-
-PixiJS v8 abstracted behind a clean API. Games don't touch Pixi directly.
-
-```
-┌─────────────────────────────────────────────────────┐
-│  @bonk/render                                       │
-│  ┌───────────────────────────────────────────────┐  │
-│  │  Sprite(src, position) → SpriteHandle         │  │
-│  │  AnimatedSprite(config) → AnimatedHandle      │  │
-│  │  Text(content, style) → TextHandle            │  │
-│  │  Camera: follow, zoom, bounds                 │  │
-│  └───────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────┘
-                        │
-                        ▼
-┌─────────────────────────────────────────────────────┐
-│  PixiJS v8 (internal)                               │
-│  - PIXI.Application wrapper                         │
-│  - Sortable container for z-index                   │
-│  - Texture caching via PIXI.Assets                  │
-└─────────────────────────────────────────────────────┘
-```
-
-## Physics
-
-Matter.js for rigid body dynamics. Verlet kinematic system planned for projectiles, particles, and game-owned collision response.
-
-```
-┌─────────────────────────────────────────────────────┐
-│  @bonk/physics                                      │
-│  ┌───────────────────────────────────────────────┐  │
-│  │  PhysicsWorld: step, gravity, raycast, query  │  │
-│  │  RigidBody: create, forces, velocity          │  │
-│  │  Collider: box, circle, polygon, sensor       │  │
-│  │  CollisionLayers: name-to-bitmask registry    │  │
-│  │  Callbacks: onCollision, onTrigger            │  │
-│  └───────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────┘
-                        │
-                        ▼
-┌─────────────────────────────────────────────────────┐
-│  Matter.js (internal)                               │
-│  - Rigid body dynamics                              │
-│  - Shape-vs-shape collision                         │
-│  - Contact solving                                  │
-└─────────────────────────────────────────────────────┘
-```
-
-Planned: Verlet kinematic system for lightweight physics (projectiles, particles) where the game owns collision response.
 
 ## Input
 
-```typescript
-// Named axes and buttons (configurable)
-const moveX = Input.getAxisRaw('horizontal');  // -1, 0, or 1
-const jump = Input.getButtonDown('jump');       // true on press frame
+Static class with three access layers:
 
-// Raw key access
-const shift = Input.getKey('ShiftLeft');
+1. **Raw keys** — `Input.getKey(code)`, `getKeyDown(code)`, `getKeyUp(code)`
+2. **Named buttons** — `Input.getButton(name)`, configurable bindings
+3. **Smoothed axes** — `Input.getAxis(name)`, returns -1 to 1 with interpolation
 
-// Mouse
-const [mx, my] = Input.mousePosition;
-const click = Input.getMouseButtonDown(0);
-```
-
-## Audio
-
-Howler.js with volume categories and spatial audio:
-
-```typescript
-import { AudioManager } from '@bonk/audio';
-
-AudioManager.playMusic('bgm.mp3', { volume: 0.5, loop: true });
-AudioManager.playSFX('explosion.wav', { volume: 0.8 });
-```
-
-## Cross-Platform Builds
-
-Same game code runs everywhere. The build system handles platform differences.
-
-```
-TypeScript Game Code
-        │
-        ├── npm run build:web    → Vite → static site (any web host)
-        ├── npm run build:tauri  → Tauri → native desktop (Steam-ready)
-        └── npm run build:mobile → Capacitor → iOS/Android
-```
-
-## Layer 3: Bonk Overlay
-
-Layer 3 is always optional. It subscribes to Layer 1's lifecycle events (body created, sprite added, collision fired) and renders debug info over whatever the game built. Same overlay works on every Bonk game.
-
-```
-@bonk/devtools    Debug wireframes, physics outlines, state inspector
-@bonk/perf        FPS counter, draw calls, body count, memory
-@bonk/build       Build targets: browser, Tauri (Steam), Capacitor (mobile)
-```
-
-Layer 3 never touches Layer 2. The key contract: Layer 1 emits events, Layer 3 subscribes, Layer 2 doesn't know either is watching. Add one line to `vite.config.ts` to enable. Production builds don't include it.
+`Input.update()` is called automatically by the Game loop at the end of each frame to clear per-frame edge triggers.
 
 ## Project Structure
 
 ```
 bonkjs/
 ├── src/
-│   ├── runtime/       # Game, Time, Scheduler, EventSystem, Transform
-│   ├── render/        # Renderer, PixiRenderer, Sprite, AnimatedSprite, Camera
-│   ├── physics/       # PhysicsWorld, MatterPhysicsWorld, CollisionLayers, RigidBody
-│   ├── input/         # Input
-│   ├── audio/         # AudioManager, AudioSource
-│   ├── math/          # vec2
-│   ├── ui/            # UIManager, UIElement, primitives, layout
-│   ├── types.ts       # Shared types (Vector2, AxisConfig, TransformJson, etc.)
-│   ├── index.ts       # Public API barrel export
-│   └── main.ts        # Example game
-└── docs/              # Documentation
+│   ├── Game.ts        # PixiJS bootstrap + fixed/variable timestep loop
+│   ├── Time.ts        # Delta time, elapsed time, time scaling
+│   ├── Camera.ts      # 2D camera (operates on PixiJS Container)
+│   ├── Input.ts       # Keyboard, mouse, axes, buttons
+│   ├── Keys.ts        # Typed KeyboardEvent.code constants
+│   ├── vec2.ts        # Functional vector math
+│   ├── types.ts       # Vector2, Color, input config types
+│   ├── index.ts       # Barrel export
+│   └── devtools/      # Tweaker runtime constant editor
+│       ├── Tweaker.ts
+│       ├── TweakerOverlay.ts
+│       ├── tweaker-styles.ts
+│       ├── types.ts
+│       └── index.ts
+├── docs/              # Documentation
+├── CLAUDE.md          # AI collaboration context
+└── README.md          # Package overview
 ```

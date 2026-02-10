@@ -31,7 +31,7 @@ export default defineConfig(({ command }) => {
         fileName: 'bonkjs',
       },
       rollupOptions: {
-        external: ['pixi.js', 'matter-js', 'howler'],
+        external: ['pixi.js'],
       },
       target: 'ES2022',
       sourcemap: true,
